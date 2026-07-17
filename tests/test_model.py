@@ -1,0 +1,55 @@
+from __future__ import annotations
+
+import numpy as np
+import pandas as pd
+import pandas.testing as pdt
+
+from robot_quant.model import PredictionConfig, WalkForwardPredictor
+
+
+def _price_frame(periods: int = 420) -> tuple[pd.DataFrame, pd.DataFrame]:
+    dates = pd.bdate_range("2024-01-02", periods=periods)
+    x = np.arange(periods, dtype=float)
+    robot_returns = 0.0004 + 0.003 * np.sin(x / 13.0) + 0.001 * np.cos(x / 5.0)
+    benchmark_returns = 0.0002 + 0.0015 * np.sin(x / 17.0)
+    robot_close = 100.0 * np.exp(np.cumsum(robot_returns))
+    benchmark_close = 100.0 * np.exp(np.cumsum(benchmark_returns))
+
+    robot = pd.DataFrame(
+        {
+            "open": robot_close,
+            "close": robot_close,
+            "volume": 1_000_000.0 + 50_000.0 * np.sin(x / 9.0),
+        },
+        index=dates,
+    )
+    benchmark = pd.DataFrame(
+        {
+            "open": benchmark_close,
+            "close": benchmark_close,
+            "volume": 2_000_000.0,
+        },
+        index=dates,
+    )
+    return robot, benchmark
+
+
+def test_walk_forward_predictions_do_not_change_when_future_prices_change() -> None:
+    robot, benchmark = _price_frame()
+    predictor = WalkForwardPredictor(
+        PredictionConfig(horizon_days=5, minimum_training_samples=100)
+    )
+
+    original = predictor.predict_history(robot, benchmark)
+    changed_robot = robot.copy()
+    future_start = changed_robot.index[380]
+    changed_robot.loc[future_start:, "close"] *= 1.5
+    changed_robot.loc[future_start:, "open"] *= 1.5
+    changed = predictor.predict_history(changed_robot, benchmark)
+
+    pdt.assert_series_equal(
+        original.loc[original.index < future_start, "probability"],
+        changed.loc[changed.index < future_start, "probability"],
+    )
+    assert set(original["target_weight"].unique()).issubset({0.0, 0.5, 1.0})
+    assert original["probability"].between(0.0, 1.0).all()
