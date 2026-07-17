@@ -91,7 +91,7 @@
   "model_validation": {
     "accuracy_wilson95_high": 0.7553003107462404,
     "accuracy_wilson95_low": 0.3654655436930671,
-    "calibrated_brier": 0.25665076926202196,
+    "calibrated_brier": 0.256650769262022,
     "calibrated_sample_count": 201,
     "calibration_method": "sigmoid_timeseries_gap10",
     "confidence_direction_accuracy": 0.5714285714285714,
@@ -110,7 +110,7 @@
   "sell_indicators": {
     "action": "watch",
     "current_market_trend_120": -0.04606280365619386,
-    "current_volatility_20": 0.6762860595167753,
+    "current_volatility_20": 0.6762860595167756,
     "exit_loss_probability_trigger": 0.65,
     "probability_exit_trigger": 0.35,
     "probability_reduce_trigger": 0.45,
