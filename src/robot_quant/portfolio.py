@@ -12,8 +12,8 @@ import pandas as pd
 class PortfolioConfig:
     """模拟账户参数。"""
 
-    initial_contribution: float = 10_000.0
-    monthly_contribution: float = 1_000.0
+    initial_contribution: float
+    monthly_contribution: float
     lot_size: int = 100
     commission_rate: float = 0.0003
     minimum_commission: float = 5.0

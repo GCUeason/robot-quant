@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
@@ -12,6 +13,24 @@ from robot_quant.model import PredictionConfig, WalkForwardPredictor
 from robot_quant.pipeline import build_execution_frame
 from robot_quant.portfolio import PortfolioConfig, PortfolioSimulator
 from robot_quant.report import write_outputs
+
+
+@dataclass(frozen=True)
+class SimulationPlan:
+    """首次建仓与后续定投计划。"""
+
+    start_date: pd.Timestamp
+    initial_contribution: float
+    monthly_contribution: float
+    initial_target_weight: float
+
+
+SIMULATION_PLAN = SimulationPlan(
+    start_date=pd.Timestamp("2026-07-20"),
+    initial_contribution=15_000.0,
+    monthly_contribution=1_000.0,
+    initial_target_weight=1.0,
+)
 
 
 def run_daily(
@@ -30,21 +49,45 @@ def run_daily(
     predictions = predictor.predict_history(bundle.robot_index, bundle.benchmark)
     execution = build_execution_frame(bundle.etf, predictions)
 
-    portfolio_config = PortfolioConfig()
+    plan = SIMULATION_PLAN
+    portfolio_config = PortfolioConfig(
+        initial_contribution=plan.initial_contribution,
+        monthly_contribution=plan.monthly_contribution,
+    )
     simulator = PortfolioSimulator(portfolio_config)
-    strategy = simulator.run(execution)
-    baseline_execution = bundle.etf.loc[:, ["open", "close"]].copy()
+    simulation_execution = execution.loc[execution.index >= plan.start_date].copy()
+    if simulation_execution.empty:
+        history = _empty_history()
+        state = _pending_state(
+            bundle.etf,
+            predictions,
+            plan,
+        )
+        write_outputs(history, state, output_path)
+        return state
+
+    simulation_execution.iloc[
+        0,
+        simulation_execution.columns.get_loc("target_weight"),
+    ] = plan.initial_target_weight
+    strategy = simulator.run(simulation_execution)
+    simulation_etf = bundle.etf.loc[bundle.etf.index >= plan.start_date]
+    baseline_execution = simulation_etf.loc[:, ["open", "close"]].copy()
     baseline_execution["target_weight"] = 1.0
     baseline = simulator.run(baseline_execution)
 
     history = _combine_history(
-        etf=bundle.etf,
+        etf=simulation_etf,
         predictions=predictions,
-        execution=execution,
+        execution=simulation_execution,
         strategy=strategy,
         baseline=baseline,
     )
-    state = _latest_state(history, predictions, portfolio_config)
+    state = _latest_state(
+        history,
+        predictions,
+        plan,
+    )
     write_outputs(history, state, output_path)
     return state
 
@@ -84,7 +127,7 @@ def _flow_adjusted_nav(account: pd.DataFrame) -> pd.Series:
 def _latest_state(
     history: pd.DataFrame,
     predictions: pd.DataFrame,
-    config: PortfolioConfig,
+    plan: SimulationPlan,
 ) -> dict:
     latest = history.iloc[-1]
     latest_prediction = predictions.iloc[-1]
@@ -92,22 +135,18 @@ def _latest_state(
     strategy_value = float(latest["strategy_portfolio_value"])
     baseline_value = float(latest["baseline_portfolio_value"])
 
-    realized = predictions.dropna(subset=["realized_label"])
-    if realized.empty:
-        prediction_accuracy = None
-    else:
-        predicted_label = (realized["probability"] >= 0.5).astype(float)
-        prediction_accuracy = float((predicted_label == realized["realized_label"]).mean())
-
     return {
+        "simulation_status": "active",
+        "simulation_start_date": plan.start_date.strftime("%Y-%m-%d"),
         "market_date": history.index[-1].strftime("%Y-%m-%d"),
         "etf_close": float(latest["etf_close"]),
         "prediction_probability": float(latest_prediction["probability"]),
         "next_target_weight": float(latest_prediction["target_weight"]),
         "model_kind": str(latest_prediction["model_kind"]),
-        "prediction_accuracy": prediction_accuracy,
-        "initial_contribution": config.initial_contribution,
-        "monthly_contribution": config.monthly_contribution,
+        "prediction_accuracy": _prediction_accuracy(predictions),
+        "initial_contribution": plan.initial_contribution,
+        "initial_target_weight": plan.initial_target_weight,
+        "monthly_contribution": plan.monthly_contribution,
         "total_contributions": contributions,
         "strategy_value": strategy_value,
         "strategy_profit": strategy_value - contributions,
@@ -119,6 +158,66 @@ def _latest_state(
         "baseline_max_drawdown": _max_drawdown(history["baseline_nav"]),
         "strategy_value_difference": strategy_value - baseline_value,
     }
+
+
+def _pending_state(
+    etf: pd.DataFrame,
+    predictions: pd.DataFrame,
+    plan: SimulationPlan,
+) -> dict:
+    latest_prediction = predictions.iloc[-1]
+    return {
+        "simulation_status": "pending",
+        "simulation_start_date": plan.start_date.strftime("%Y-%m-%d"),
+        "market_date": etf.index[-1].strftime("%Y-%m-%d"),
+        "etf_close": float(etf.iloc[-1]["close"]),
+        "prediction_probability": float(latest_prediction["probability"]),
+        "next_target_weight": float(latest_prediction["target_weight"]),
+        "model_kind": str(latest_prediction["model_kind"]),
+        "prediction_accuracy": _prediction_accuracy(predictions),
+        "initial_contribution": plan.initial_contribution,
+        "initial_target_weight": plan.initial_target_weight,
+        "monthly_contribution": plan.monthly_contribution,
+        "total_contributions": 0.0,
+        "strategy_value": 0.0,
+        "strategy_profit": 0.0,
+        "strategy_roi": None,
+        "strategy_max_drawdown": None,
+        "baseline_value": 0.0,
+        "baseline_profit": 0.0,
+        "baseline_roi": None,
+        "baseline_max_drawdown": None,
+        "strategy_value_difference": 0.0,
+    }
+
+
+def _prediction_accuracy(predictions: pd.DataFrame) -> float | None:
+    realized = predictions.dropna(subset=["realized_label"])
+    if realized.empty:
+        return None
+    predicted_label = (realized["probability"] >= 0.5).astype(float)
+    return float((predicted_label == realized["realized_label"]).mean())
+
+
+def _empty_history() -> pd.DataFrame:
+    columns = [
+        "etf_open",
+        "etf_close",
+        "signal_probability",
+        "next_target_weight",
+        "executed_target_weight",
+        "contribution",
+        "total_contributions",
+        "strategy_cash",
+        "strategy_shares",
+        "strategy_portfolio_value",
+        "strategy_nav",
+        "baseline_cash",
+        "baseline_shares",
+        "baseline_portfolio_value",
+        "baseline_nav",
+    ]
+    return pd.DataFrame(columns=columns, index=pd.DatetimeIndex([], name="date"))
 
 
 def _max_drawdown(nav: pd.Series) -> float:

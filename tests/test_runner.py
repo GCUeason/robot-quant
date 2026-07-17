@@ -8,8 +8,8 @@ import pandas as pd
 from robot_quant.runner import run_daily
 
 
-def _write_market_data(directory) -> None:
-    dates = pd.bdate_range("2024-01-02", periods=420)
+def _write_market_data(directory, periods: int = 720) -> None:
+    dates = pd.bdate_range("2024-01-02", periods=periods)
     x = np.arange(len(dates), dtype=float)
 
     def frame(base: float, drift: float, cycle: float) -> pd.DataFrame:
@@ -46,11 +46,39 @@ def test_run_daily_is_idempotent_and_writes_observable_results(tmp_path) -> None
     assert first_history == second_history
     state = json.loads((output_dir / "data" / "latest_state.json").read_text())
     history = pd.read_csv(output_dir / "data" / "portfolio_history.csv")
-    expected_contributions = 10_000.0 + 1_000.0 * (history["date"].str[:7].nunique() - 1)
+    expected_contributions = 15_000.0 + 1_000.0 * (history["date"].str[:7].nunique() - 1)
     assert state["total_contributions"] == expected_contributions
-    assert state["initial_contribution"] == 10_000.0
+    assert state["simulation_status"] == "active"
+    assert state["simulation_start_date"] == "2026-07-20"
+    assert state["initial_contribution"] == 15_000.0
+    assert state["initial_target_weight"] == 1.0
     assert state["monthly_contribution"] == 1_000.0
+    assert history.iloc[0]["date"] == "2026-07-20"
+    assert history.iloc[0]["contribution"] == 15_000.0
+    assert history.iloc[0]["executed_target_weight"] == 1.0
+    assert history.iloc[0]["strategy_shares"] > 0
     report = (output_dir / "reports" / "latest.md").read_text()
     assert "未来10个交易日跑赢沪深300的预测概率" in report
     assert "上涨并跑赢" not in report
     assert (output_dir / "reports" / "performance.png").exists()
+
+
+def test_run_daily_reports_pending_before_planned_initial_purchase(tmp_path) -> None:
+    input_dir = tmp_path / "input"
+    output_dir = tmp_path / "output"
+    _write_market_data(input_dir, periods=420)
+
+    run_daily(offline_data_dir=input_dir, output_root=output_dir)
+
+    state = json.loads((output_dir / "data" / "latest_state.json").read_text())
+    history = pd.read_csv(output_dir / "data" / "portfolio_history.csv")
+    report = (output_dir / "reports" / "latest.md").read_text()
+    assert state["simulation_status"] == "pending"
+    assert state["simulation_start_date"] == "2026-07-20"
+    assert state["initial_contribution"] == 15_000.0
+    assert state["initial_target_weight"] == 1.0
+    assert state["total_contributions"] == 0.0
+    assert history.empty
+    assert "模拟账户尚未开始" in report
+    assert "2026-07-20" in report
+    assert "¥15,000" in report
