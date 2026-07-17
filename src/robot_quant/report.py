@@ -63,7 +63,7 @@ def _markdown(state: dict) -> str:
 
 ## 下一交易日预测
 
-- 上涨并跑赢沪深300的预测概率：**{state['prediction_probability']:.2%}**
+- 未来10个交易日跑赢沪深300的预测概率：**{state['prediction_probability']:.2%}**
 - 建议目标仓位：**{target_percent:.0f}%**
 - 当前使用模型：`{state['model_kind']}`
 

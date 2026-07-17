@@ -50,5 +50,7 @@ def test_run_daily_is_idempotent_and_writes_observable_results(tmp_path) -> None
     assert state["total_contributions"] == expected_contributions
     assert state["initial_contribution"] == 10_000.0
     assert state["monthly_contribution"] == 1_000.0
-    assert (output_dir / "reports" / "latest.md").exists()
+    report = (output_dir / "reports" / "latest.md").read_text()
+    assert "未来10个交易日跑赢沪深300的预测概率" in report
+    assert "上涨并跑赢" not in report
     assert (output_dir / "reports" / "performance.png").exists()
