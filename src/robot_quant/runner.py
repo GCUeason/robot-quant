@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 
 from robot_quant.data import fetch_live_bundle, read_offline_bundle
+from robot_quant.indicators import build_forecast_indicators
 from robot_quant.model import PredictionConfig, WalkForwardPredictor
 from robot_quant.pipeline import build_execution_frame
 from robot_quant.portfolio import PortfolioConfig, PortfolioSimulator
@@ -54,6 +55,11 @@ def run_daily(
         initial_contribution=plan.initial_contribution,
         monthly_contribution=plan.monthly_contribution,
     )
+    indicators = build_forecast_indicators(
+        etf=bundle.etf,
+        predictions=predictions,
+        capital=plan.initial_contribution,
+    )
     simulator = PortfolioSimulator(portfolio_config)
     simulation_execution = execution.loc[execution.index >= plan.start_date].copy()
     if simulation_execution.empty:
@@ -63,6 +69,7 @@ def run_daily(
             predictions,
             plan,
         )
+        state.update(indicators)
         write_outputs(history, state, output_path)
         return state
 
@@ -88,6 +95,7 @@ def run_daily(
         predictions,
         plan,
     )
+    state.update(indicators)
     write_outputs(history, state, output_path)
     return state
 
@@ -140,6 +148,7 @@ def _latest_state(
         "simulation_start_date": plan.start_date.strftime("%Y-%m-%d"),
         "market_date": history.index[-1].strftime("%Y-%m-%d"),
         "etf_close": float(latest["etf_close"]),
+        "raw_prediction_probability": float(latest_prediction["raw_probability"]),
         "prediction_probability": float(latest_prediction["probability"]),
         "next_target_weight": float(latest_prediction["target_weight"]),
         "model_kind": str(latest_prediction["model_kind"]),
@@ -171,6 +180,7 @@ def _pending_state(
         "simulation_start_date": plan.start_date.strftime("%Y-%m-%d"),
         "market_date": etf.index[-1].strftime("%Y-%m-%d"),
         "etf_close": float(etf.iloc[-1]["close"]),
+        "raw_prediction_probability": float(latest_prediction["raw_probability"]),
         "prediction_probability": float(latest_prediction["probability"]),
         "next_target_weight": float(latest_prediction["target_weight"]),
         "model_kind": str(latest_prediction["model_kind"]),

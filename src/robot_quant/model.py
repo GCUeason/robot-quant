@@ -6,7 +6,9 @@ from dataclasses import dataclass
 
 import numpy as np
 import pandas as pd
+from sklearn.calibration import CalibratedClassifierCV
 from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import TimeSeriesSplit
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 
@@ -20,6 +22,8 @@ class PredictionConfig:
     half_position_probability: float = 0.50
     full_position_probability: float = 0.60
     logistic_c: float = 0.10
+    calibration_splits: int = 5
+    calibration_gap: int = 10
 
 
 class WalkForwardPredictor:
@@ -52,21 +56,23 @@ class WalkForwardPredictor:
         for _, monthly_data in dataset.groupby(dataset.index.to_period("M"), sort=True):
             training_cutoff = monthly_data.index[0]
             train_mask = dataset["label_known_date"].lt(training_cutoff)
-            train_data = dataset.loc[train_mask].dropna(
-                subset=[*self.FEATURE_COLUMNS, "label"]
-            )
-            model = self._fit_model(train_data)
+            train_data = dataset.loc[train_mask].dropna(subset=[*self.FEATURE_COLUMNS, "label"])
+            raw_model, calibrated_model = self._fit_models(train_data)
 
             for date, row in monthly_data.iterrows():
                 features = row.loc[list(self.FEATURE_COLUMNS)]
-                if model is not None and features.notna().all():
+                if raw_model is not None and features.notna().all():
                     feature_frame = features.to_frame().T.astype(float)
-                    probability = float(
-                        model.predict_proba(feature_frame)[0, 1]
-                    )
-                    model_kind = "logistic_regression"
+                    raw_probability = float(raw_model.predict_proba(feature_frame)[0, 1])
+                    if calibrated_model is not None:
+                        probability = float(calibrated_model.predict_proba(feature_frame)[0, 1])
+                        model_kind = "calibrated_logistic_regression"
+                    else:
+                        probability = raw_probability
+                        model_kind = "logistic_regression_uncalibrated"
                 else:
                     probability = self._fallback_probability(row)
+                    raw_probability = probability
                     model_kind = "trend_fallback"
 
                 target_weight = self._target_weight(
@@ -76,14 +82,43 @@ class WalkForwardPredictor:
                 records.append(
                     {
                         "date": pd.Timestamp(date),
+                        "raw_probability": raw_probability,
                         "probability": probability,
                         "target_weight": target_weight,
                         "model_kind": model_kind,
                         "realized_label": float(row["label"]),
+                        "market_trend_120": float(row["market_trend_120"]),
+                        "volatility_20": float(row["volatility_20"]),
+                        "relative_strength_20": float(row["relative_strength_20"]),
                     }
                 )
 
         return pd.DataFrame.from_records(records).set_index("date")
+
+    def _fit_models(
+        self,
+        training_data: pd.DataFrame,
+    ) -> tuple[Pipeline | None, CalibratedClassifierCV | None]:
+        raw_model = self._fit_model(training_data)
+        if raw_model is None:
+            return None, None
+
+        features = training_data.loc[:, self.FEATURE_COLUMNS]
+        labels = training_data["label"].astype(int)
+        calibrated_model = CalibratedClassifierCV(
+            estimator=self._new_model(),
+            method="sigmoid",
+            cv=TimeSeriesSplit(
+                n_splits=self.config.calibration_splits,
+                gap=self.config.calibration_gap,
+            ),
+            ensemble=True,
+        )
+        try:
+            calibrated_model.fit(features, labels)
+        except ValueError:
+            return raw_model, None
+        return raw_model, calibrated_model
 
     def _build_dataset(
         self,
@@ -115,12 +150,8 @@ class WalkForwardPredictor:
         dataset["distance_ma60"] = robot_close / robot_close.rolling(60).mean() - 1.0
         dataset["volatility_20"] = daily_return.rolling(20).std() * np.sqrt(252.0)
         dataset["volume_ratio_20"] = robot_volume / robot_volume.rolling(20).mean()
-        dataset["relative_strength_20"] = (
-            robot_close.pct_change(20) - market_close.pct_change(20)
-        )
-        dataset["market_trend_120"] = (
-            market_close / market_close.rolling(120).mean() - 1.0
-        )
+        dataset["relative_strength_20"] = robot_close.pct_change(20) - market_close.pct_change(20)
+        dataset["market_trend_120"] = market_close / market_close.rolling(120).mean() - 1.0
 
         horizon = self.config.horizon_days
         future_robot_return = robot_close.shift(-horizon) / robot_close - 1.0
@@ -141,7 +172,12 @@ class WalkForwardPredictor:
         if labels.nunique() < 2:
             return None
 
-        model = Pipeline(
+        model = self._new_model()
+        model.fit(training_data.loc[:, self.FEATURE_COLUMNS], labels)
+        return model
+
+    def _new_model(self) -> Pipeline:
+        return Pipeline(
             steps=[
                 ("scale", StandardScaler()),
                 (
@@ -155,8 +191,6 @@ class WalkForwardPredictor:
                 ),
             ]
         )
-        model.fit(training_data.loc[:, self.FEATURE_COLUMNS], labels)
-        return model
 
     def _fallback_probability(self, row: pd.Series) -> float:
         probability = 0.50
@@ -169,10 +203,7 @@ class WalkForwardPredictor:
         return float(np.clip(probability, 0.05, 0.95))
 
     def _target_weight(self, probability: float, market_trend: float) -> float:
-        if (
-            probability >= self.config.full_position_probability
-            and market_trend > 0.0
-        ):
+        if probability >= self.config.full_position_probability and market_trend > 0.0:
             return 1.0
         if probability >= self.config.half_position_probability:
             return 0.5

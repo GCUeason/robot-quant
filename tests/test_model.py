@@ -36,9 +36,7 @@ def _price_frame(periods: int = 420) -> tuple[pd.DataFrame, pd.DataFrame]:
 
 def test_walk_forward_predictions_do_not_change_when_future_prices_change() -> None:
     robot, benchmark = _price_frame()
-    predictor = WalkForwardPredictor(
-        PredictionConfig(horizon_days=5, minimum_training_samples=100)
-    )
+    predictor = WalkForwardPredictor(PredictionConfig(horizon_days=5, minimum_training_samples=100))
 
     original = predictor.predict_history(robot, benchmark)
     changed_robot = robot.copy()
@@ -53,3 +51,27 @@ def test_walk_forward_predictions_do_not_change_when_future_prices_change() -> N
     )
     assert set(original["target_weight"].unique()).issubset({0.0, 0.5, 1.0})
     assert original["probability"].between(0.0, 1.0).all()
+
+
+def test_walk_forward_predictions_expose_gap_calibrated_and_raw_probabilities() -> None:
+    robot, benchmark = _price_frame(periods=520)
+    predictor = WalkForwardPredictor(
+        PredictionConfig(
+            horizon_days=5,
+            minimum_training_samples=120,
+            calibration_splits=3,
+            calibration_gap=5,
+        )
+    )
+
+    predictions = predictor.predict_history(robot, benchmark)
+    calibrated = predictions[predictions["model_kind"] == "calibrated_logistic_regression"]
+
+    assert "raw_probability" in predictions.columns
+    assert not calibrated.empty
+    assert calibrated["probability"].between(0.0, 1.0).all()
+    assert calibrated["raw_probability"].between(0.0, 1.0).all()
+    assert not np.allclose(
+        calibrated["probability"].to_numpy(),
+        calibrated["raw_probability"].to_numpy(),
+    )
