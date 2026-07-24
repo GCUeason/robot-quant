@@ -52,7 +52,7 @@ def _write_chart(history: pd.DataFrame, state: dict, path: Path) -> None:
         plt.close(fig)
         return
 
-    axis.plot(history.index, history["strategy_portfolio_value"], label="Prediction strategy")
+    axis.plot(history.index, history["strategy_portfolio_value"], label="Quality-gated DCA")
     axis.plot(history.index, history["baseline_portfolio_value"], label="Fixed DCA")
     axis.plot(
         history.index,
@@ -61,7 +61,7 @@ def _write_chart(history: pd.DataFrame, state: dict, path: Path) -> None:
         color="gray",
         linestyle="--",
     )
-    axis.set_title("Robot ETF 159530: prediction strategy vs fixed DCA")
+    axis.set_title("Robot ETF 159530: quality-gated plan vs fixed DCA")
     axis.set_ylabel("CNY")
     axis.grid(alpha=0.25)
     axis.legend()
@@ -74,7 +74,8 @@ def _markdown(state: dict) -> str:
     if state["simulation_status"] == "pending":
         return _pending_markdown(state)
 
-    target_percent = state["next_target_weight"] * 100
+    target_percent = state["executable_target_weight"] * 100
+    research_target_percent = state["research_target_weight"] * 100
     initial_target_percent = state["initial_target_weight"] * 100
     return f"""# 机器人ETF模拟账户日报
 
@@ -84,11 +85,18 @@ def _markdown(state: dict) -> str:
 
 最新收盘价：**¥{state["etf_close"]:.4f}**
 
-## 下一交易日预测
+## 未来10日相对沪深300研究信号
 
 {_probability_markdown(state)}
-- 建议目标仓位：**{target_percent:.0f}%**
+- 模型原始研究仓位：**{research_target_percent:.0f}%**（不可执行）
 - 当前使用模型：`{state["model_kind"]}`
+- 当前状态：{_signal_status(state)}
+
+## 下一交易日执行计划
+
+- 可执行目标仓位：**{target_percent:.0f}%**
+- 执行政策：**固定定投是唯一可执行模拟**；模型尚未获得仓位控制权。
+- 门控原因：{_gate_reasons(state)}
 
 {_indicator_markdown(state)}
 
@@ -96,26 +104,26 @@ def _markdown(state: dict) -> str:
 
 | 账户 | 累计投入 | 当前市值 | 净盈亏 | 资金收益率 | 最大回撤 |
 |---|---:|---:|---:|---:|---:|
-| 预测策略 | ¥{state["total_contributions"]:,.2f} | ¥{state["strategy_value"]:,.2f} | ¥{state["strategy_profit"]:,.2f} | {state["strategy_roi"]:.2%} | {state["strategy_max_drawdown"]:.2%} |
+| 质量门控定投 | ¥{state["total_contributions"]:,.2f} | ¥{state["strategy_value"]:,.2f} | ¥{state["strategy_profit"]:,.2f} | {state["strategy_roi"]:.2%} | {state["strategy_max_drawdown"]:.2%} |
 | 固定定投 | ¥{state["total_contributions"]:,.2f} | ¥{state["baseline_value"]:,.2f} | ¥{state["baseline_profit"]:,.2f} | {state["baseline_roi"]:.2%} | {state["baseline_max_drawdown"]:.2%} |
 
-预测策略相对固定定投的市值差：**¥{state["strategy_value_difference"]:,.2f}**
+质量门控定投相对固定定投的市值差：**¥{state["strategy_value_difference"]:,.2f}**
 
 ![累计市值对比](performance.png)
 
 ## 口径
 
 - 从{state["simulation_start_date"]}开始，首次买入¥{state["initial_contribution"]:,.0f}。
-- 首次建仓按{initial_target_percent:.0f}%目标仓位执行，其后按模型信号调整。
+- 首次建仓按{initial_target_percent:.0f}%目标仓位执行；模型保持纯观察层，其后继续固定定投。
 - 从次月开始，每月首个交易日追加¥{state["monthly_contribution"]:,.0f}。
-- 收盘后产生信号，下一交易日开盘执行。
+- 研究信号于收盘后更新，仅记录不执行；定投按既定现金流规则在对应交易日执行。
 - 只按100份整数交易，包含配置中的佣金与滑点。
 - 这是模拟研究，不连接券商，也不构成收益承诺。
 """
 
 
 def _pending_markdown(state: dict) -> str:
-    model_target_percent = state["next_target_weight"] * 100
+    model_target_percent = state["research_target_weight"] * 100
     initial_target_percent = state["initial_target_weight"] * 100
     return f"""# 机器人ETF模拟账户日报
 
@@ -134,13 +142,19 @@ def _pending_markdown(state: dict) -> str:
 
 截至当前市场日期，计划买入日尚未到达，因此累计投入、持仓和模拟收益均为0。
 
-## 当前模型观察
+## 未来10日相对沪深300研究信号
 
 {_probability_markdown(state)}
-- 模型当前目标仓位：**{model_target_percent:.0f}%**
+- 模型原始研究仓位：**{model_target_percent:.0f}%**（不可执行）
 - 当前使用模型：`{state["model_kind"]}`
+- 当前状态：{_signal_status(state)}
 
-首次买入按既定计划执行；完成初始建仓后，后续交易才按模型目标仓位调整。
+## 下一交易日执行计划
+
+- 固定定投是唯一可执行模拟；模型不调整仓位。
+- 门控原因：{_gate_reasons(state)}
+
+首次买入按既定计划执行；后续仍按固定定投计划运行。
 
 {_indicator_markdown(state)}
 
@@ -166,6 +180,7 @@ def _indicator_markdown(state: dict) -> str:
         (
             f"| {horizon}日 | {forecast['sample_count']} | "
             f"{_evidence_label(forecast['evidence_status'])} | "
+            f"{forecast['unavailable_reason'] or '通过严格匹配'} | "
             f"{_percent(forecast['median_return'])} | "
             f"{_percent_range(forecast['return_p10'], forecast['return_p90'])} | "
             f"{_percent(forecast['loss_probability'])} | "
@@ -224,17 +239,17 @@ def _indicator_markdown(state: dict) -> str:
         f"{_percent(validation['accuracy_wilson95_low'])} ～ "
         f"{_percent(validation['accuracy_wilson95_high'])}"
     )
-    return f"""## 预估收益与下跌风险
+    return f"""## 研究型预估收益与下跌风险
 
-以下区间来自与当前信号、趋势和波动率最接近的历史状态，最多取40个样本；它是条件分布，不是确定收益。
+以下区间只使用市场趋势、相对强弱和完整特征距离均合格的历史状态，并按持有期去除重叠路径，最多取40个有效样本。有效样本少于20条时全部收益数字停用，不强行预测。
 
-| 持有期 | 相似样本 | 证据状态 | 中位收益 | 10%～90%收益区间 | 期末亏损概率 | 期间跌破现价概率 | 期间跌超5%概率 | 跌破现价后的低点窗口 | 中位预估价 | ¥{state["initial_contribution"]:,.0f}中位盈亏 |
-|---|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| 持有期 | 有效非重叠样本 | 证据状态 | 证据说明 | 中位收益 | 10%～90%收益区间 | 期末亏损概率 | 期间跌破现价概率 | 期间跌超5%概率 | 跌破现价后的低点窗口 | 中位预估价 | ¥{state["initial_contribution"]:,.0f}中位盈亏 |
+|---|---:|---|---|---:|---:|---:|---:|---:|---:|---:|---:|
 {forecast_rows}
 
 “什么时候会掉”不能精确到某一天；低点窗口只对曾跌破起始价格的历史路径统计，并给出低点日的25%～75%分位及条件样本数，不混入全程上涨路径。每天收盘后重算，优先看亏损概率和收益下界是否同步恶化。
 
-## 模拟卖出指标
+## 研究型卖出指标（不可直接执行）
 
 - 当前动作：**{action}**；原因：{sell["reason"]}。
 - 下次复核：**{sell["review_horizon_trading_days"]}个交易日内**，并在每日收盘数据更新后提前复核。
@@ -242,7 +257,7 @@ def _indicator_markdown(state: dict) -> str:
 - 10日止盈观察参考价：**{_currency(sell["take_profit_price"], 4)}**（相似样本收益90%分位对应价）。
 - 规则阈值：校准概率低于{sell["probability_reduce_trigger"]:.0%}进入减仓判断；低于{sell["probability_exit_trigger"]:.0%}且10日中位收益为负、亏损概率不低于{sell["exit_loss_probability_trigger"]:.0%}时退出；中位收益为负且亏损概率不低于{sell["reduce_loss_probability_trigger"]:.0%}时减仓；亏损概率不低于{sell["watch_loss_probability_trigger"]:.0%}时至少保持观察。
 
-参考价只用于模拟触发，不是挂单建议；是否卖出还需等收盘信号、趋势和概率共同确认。
+参考价只用于研究观察，不是挂单建议；当前固定定投政策不会执行这些动作。
 
 ### 卖出规则历史验证
 
@@ -290,6 +305,21 @@ def _probability_markdown(state: dict) -> str:
         f"- 趋势回退分数：**{state['prediction_probability']:.2%}**\n"
         "- 当日逻辑回归及概率校准不可用，不把回退分数解释为真实概率。"
     )
+
+
+def _signal_status(state: dict) -> str:
+    if state["is_out_of_distribution"]:
+        return f"**训练分布外，预测不可用**（{state['ood_features']}）"
+    return "**仅观察，不可用于自动调仓**"
+
+
+def _gate_reasons(state: dict) -> str:
+    gate = state.get("execution_gate", {})
+    reasons = gate.get(
+        "reasons",
+        ["尚未实现逐日成熟样本质量门控，禁止模型自动调整仓位"],
+    )
+    return "；".join(reasons)
 
 
 def _percent(value: float | None) -> str:

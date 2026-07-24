@@ -24,6 +24,8 @@ class PredictionConfig:
     logistic_c: float = 0.10
     calibration_splits: int = 5
     calibration_gap: int = 10
+    ood_lower_quantile: float = 0.01
+    ood_upper_quantile: float = 0.99
 
 
 class WalkForwardPredictor:
@@ -51,7 +53,7 @@ class WalkForwardPredictor:
     ) -> pd.DataFrame:
         """生成逐日概率和目标仓位；训练标签必须在预测日前已经实现。"""
         dataset = self._build_dataset(robot_index, benchmark)
-        records: list[dict[str, float | str | pd.Timestamp]] = []
+        records: list[dict[str, bool | float | str | pd.Timestamp]] = []
 
         for _, monthly_data in dataset.groupby(dataset.index.to_period("M"), sort=True):
             training_cutoff = monthly_data.index[0]
@@ -75,25 +77,60 @@ class WalkForwardPredictor:
                     raw_probability = probability
                     model_kind = "trend_fallback"
 
-                target_weight = self._target_weight(
+                research_target_weight = self._target_weight(
                     probability=probability,
                     market_trend=float(row["market_trend_120"]),
                 )
-                records.append(
-                    {
-                        "date": pd.Timestamp(date),
-                        "raw_probability": raw_probability,
-                        "probability": probability,
-                        "target_weight": target_weight,
-                        "model_kind": model_kind,
-                        "realized_label": float(row["label"]),
-                        "market_trend_120": float(row["market_trend_120"]),
-                        "volatility_20": float(row["volatility_20"]),
-                        "relative_strength_20": float(row["relative_strength_20"]),
-                    }
+                ood_features = (
+                    self._out_of_distribution_features(features, train_data)
+                    if raw_model is not None and features.notna().all()
+                    else []
                 )
+                signal_status = (
+                    "out_of_distribution"
+                    if ood_features
+                    else (
+                        "observation_only"
+                        if model_kind != "trend_fallback"
+                        else "model_unavailable"
+                    )
+                )
+                record: dict[str, bool | float | str | pd.Timestamp] = {
+                    "date": pd.Timestamp(date),
+                    "raw_probability": raw_probability,
+                    "probability": probability,
+                    "target_weight": research_target_weight,
+                    "research_target_weight": research_target_weight,
+                    "model_kind": model_kind,
+                    "signal_status": signal_status,
+                    "is_out_of_distribution": bool(ood_features),
+                    "ood_features": ",".join(ood_features),
+                    "realized_label": float(row["label"]),
+                }
+                record.update({feature: float(row[feature]) for feature in self.FEATURE_COLUMNS})
+                records.append(record)
 
         return pd.DataFrame.from_records(records).set_index("date")
+
+    def _out_of_distribution_features(
+        self,
+        features: pd.Series,
+        training_data: pd.DataFrame,
+    ) -> list[str]:
+        """仅用本月训练样本的分位边界识别不可安全外推的特征。"""
+        training_features = training_data.loc[:, self.FEATURE_COLUMNS].astype(float)
+        lower = training_features.quantile(self.config.ood_lower_quantile)
+        upper = training_features.quantile(self.config.ood_upper_quantile)
+        lower_label = _quantile_label(self.config.ood_lower_quantile)
+        upper_label = _quantile_label(self.config.ood_upper_quantile)
+        breaches: list[str] = []
+        for column in self.FEATURE_COLUMNS:
+            value = float(features[column])
+            if value < float(lower[column]):
+                breaches.append(f"{column}:below_{lower_label}")
+            elif value > float(upper[column]):
+                breaches.append(f"{column}:above_{upper_label}")
+        return breaches
 
     def _fit_models(
         self,
@@ -208,3 +245,7 @@ class WalkForwardPredictor:
         if probability >= self.config.half_position_probability:
             return 0.5
         return 0.0
+
+
+def _quantile_label(quantile: float) -> str:
+    return f"{quantile * 100:g}pct"
