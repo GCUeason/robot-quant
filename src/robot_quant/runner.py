@@ -48,7 +48,9 @@ def run_daily(
     )
     predictor = WalkForwardPredictor(PredictionConfig())
     predictions = predictor.predict_history(bundle.robot_index, bundle.benchmark)
-    execution = build_execution_frame(bundle.etf, predictions)
+    research_execution = build_execution_frame(bundle.etf, predictions)
+    execution = research_execution.copy()
+    execution["target_weight"] = 1.0
 
     plan = SIMULATION_PLAN
     portfolio_config = PortfolioConfig(
@@ -112,7 +114,8 @@ def _combine_history(
     history["etf_close"] = etf["close"].astype(float)
     aligned_predictions = predictions.reindex(history.index, method="ffill")
     history["signal_probability"] = aligned_predictions["probability"]
-    history["next_target_weight"] = aligned_predictions["target_weight"]
+    history["research_target_weight"] = aligned_predictions["research_target_weight"]
+    history["next_target_weight"] = 1.0
     history["executed_target_weight"] = execution["target_weight"]
     history["contribution"] = strategy["contribution"]
     history["total_contributions"] = strategy["total_contributions"]
@@ -150,7 +153,14 @@ def _latest_state(
         "etf_close": float(latest["etf_close"]),
         "raw_prediction_probability": float(latest_prediction["raw_probability"]),
         "prediction_probability": float(latest_prediction["probability"]),
-        "next_target_weight": float(latest_prediction["target_weight"]),
+        "research_target_weight": float(latest_prediction["research_target_weight"]),
+        "next_target_weight": 1.0,
+        "executable_target_weight": 1.0,
+        "model_control_enabled": False,
+        "execution_policy": "fixed_dca_only",
+        "signal_status": str(latest_prediction["signal_status"]),
+        "is_out_of_distribution": bool(latest_prediction["is_out_of_distribution"]),
+        "ood_features": str(latest_prediction["ood_features"]),
         "model_kind": str(latest_prediction["model_kind"]),
         "prediction_accuracy": _prediction_accuracy(predictions),
         "initial_contribution": plan.initial_contribution,
@@ -182,7 +192,14 @@ def _pending_state(
         "etf_close": float(etf.iloc[-1]["close"]),
         "raw_prediction_probability": float(latest_prediction["raw_probability"]),
         "prediction_probability": float(latest_prediction["probability"]),
-        "next_target_weight": float(latest_prediction["target_weight"]),
+        "research_target_weight": float(latest_prediction["research_target_weight"]),
+        "next_target_weight": 1.0,
+        "executable_target_weight": 1.0,
+        "model_control_enabled": False,
+        "execution_policy": "fixed_dca_only",
+        "signal_status": str(latest_prediction["signal_status"]),
+        "is_out_of_distribution": bool(latest_prediction["is_out_of_distribution"]),
+        "ood_features": str(latest_prediction["ood_features"]),
         "model_kind": str(latest_prediction["model_kind"]),
         "prediction_accuracy": _prediction_accuracy(predictions),
         "initial_contribution": plan.initial_contribution,
@@ -214,6 +231,7 @@ def _empty_history() -> pd.DataFrame:
         "etf_open",
         "etf_close",
         "signal_probability",
+        "research_target_weight",
         "next_target_weight",
         "executed_target_weight",
         "contribution",

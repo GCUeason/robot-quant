@@ -75,3 +75,29 @@ def test_walk_forward_predictions_expose_gap_calibrated_and_raw_probabilities() 
         calibrated["probability"].to_numpy(),
         calibrated["raw_probability"].to_numpy(),
     )
+
+
+def test_walk_forward_marks_extreme_latest_state_as_out_of_distribution() -> None:
+    robot, benchmark = _price_frame(periods=520)
+    robot.loc[robot.index[-5] :, "close"] *= np.linspace(1.0, 0.55, 5)
+    robot.loc[robot.index[-5] :, "open"] = robot.loc[robot.index[-5] :, "close"]
+    predictor = WalkForwardPredictor(
+        PredictionConfig(
+            horizon_days=5,
+            minimum_training_samples=120,
+            calibration_splits=3,
+            calibration_gap=5,
+            ood_lower_quantile=0.05,
+            ood_upper_quantile=0.95,
+        )
+    )
+
+    predictions = predictor.predict_history(robot, benchmark)
+    latest = predictions.iloc[-1]
+
+    assert bool(latest["is_out_of_distribution"]) is True
+    assert latest["ood_features"]
+    assert "1pct" not in latest["ood_features"]
+    assert "5pct" in latest["ood_features"] or "95pct" in latest["ood_features"]
+    assert latest["signal_status"] == "out_of_distribution"
+    assert "research_target_weight" in predictions.columns

@@ -9,10 +9,15 @@ import numpy as np
 import pandas as pd
 from sklearn.metrics import roc_auc_score
 
+from robot_quant.model import WalkForwardPredictor
+
 HORIZONS = (5, 10, 20)
 ANALOG_COUNT = 40
 MIN_ANALOG_COUNT = 20
 CALIBRATED_MODEL = "calibrated_logistic_regression"
+RELATIVE_STRENGTH_TOLERANCE = 0.03
+MAX_SIMILARITY_DISTANCE = 3.0
+ANALOG_FEATURES = WalkForwardPredictor.FEATURE_COLUMNS
 
 
 @dataclass(frozen=True)
@@ -59,7 +64,7 @@ def build_forecast_indicators(
         ]
         if current["model_kind"] != CALIBRATED_MODEL:
             known = known.iloc[0:0]
-        analogs = _select_analogs(known, current)
+        analogs = _select_analogs(known, current, horizon, frame.index)
         forecasts[str(horizon)] = _summarize_horizon(
             analogs=analogs,
             current_close=float(current["close"]),
@@ -69,13 +74,14 @@ def build_forecast_indicators(
         )
 
     model_validation = _model_validation(frame)
-    sell_indicators = _sell_indicators(frame, forecasts)
+    sell_indicators = _sell_indicators(frame, forecasts, model_validation)
     sell_rule_validation = _validate_sell_rule(frame)
     return {
         "forecast_horizons": forecasts,
         "sell_indicators": sell_indicators,
         "sell_rule_validation": sell_rule_validation,
         "model_validation": model_validation,
+        "execution_gate": _execution_gate(current, model_validation),
     }
 
 
@@ -90,35 +96,138 @@ def _future_downside(close: pd.Series, horizon: int) -> tuple[pd.Series, pd.Seri
     return worst, trough_day
 
 
-def _select_analogs(pool: pd.DataFrame, current: pd.Series) -> pd.DataFrame:
-    required = [
-        "probability",
-        "target_weight",
-        "market_trend_120",
-        "volatility_20",
-    ]
+def _select_analogs(
+    pool: pd.DataFrame,
+    current: pd.Series,
+    horizon: int,
+    timeline: pd.Index,
+) -> pd.DataFrame:
+    """严格匹配完整状态并剔除收益路径重叠的历史样本。"""
+    required = [*ANALOG_FEATURES, "is_out_of_distribution"]
+    missing = [column for column in required if column not in pool or column not in current.index]
+    if missing:
+        return _selection_result(
+            pool,
+            reason=f"缺少状态特征：{', '.join(missing)}",
+            candidate_count=len(pool),
+        )
+    if bool(current["is_out_of_distribution"]):
+        return _selection_result(
+            pool,
+            reason=f"当前状态处于训练分布外：{current.get('ood_features', '')}",
+            candidate_count=len(pool),
+        )
+
     available = pool.dropna(subset=required).copy()
+    available = available.loc[~available["is_out_of_distribution"].astype(bool)]
+    candidate_count = len(available)
     if available.empty:
-        return available
+        return _selection_result(pool, reason="没有训练分布内候选样本")
 
+    current_market_sign = np.sign(float(current["market_trend_120"]))
     same_regime = available[
-        np.sign(available["market_trend_120"]) == np.sign(float(current["market_trend_120"]))
+        np.sign(available["market_trend_120"].astype(float)) == current_market_sign
     ]
-    if len(same_regime) >= MIN_ANALOG_COUNT:
-        available = same_regime
+    regime_count = len(same_regime)
+    if regime_count < MIN_ANALOG_COUNT:
+        return _selection_result(
+            pool,
+            reason=f"同市场状态样本不足20条（当前{regime_count}条）",
+            candidate_count=candidate_count,
+            regime_match_count=regime_count,
+        )
 
-    same_weight = available[available["target_weight"].eq(float(current["target_weight"]))]
-    if len(same_weight) >= MIN_ANALOG_COUNT:
-        available = same_weight
+    current_strength = float(current["relative_strength_20"])
+    same_strength = same_regime[
+        (np.sign(same_regime["relative_strength_20"].astype(float)) == np.sign(current_strength))
+        & (
+            (same_regime["relative_strength_20"].astype(float) - current_strength).abs()
+            <= RELATIVE_STRENGTH_TOLERANCE
+        )
+    ]
+    strength_count = len(same_strength)
+    if strength_count < MIN_ANALOG_COUNT:
+        return _selection_result(
+            pool,
+            reason=f"相对强弱匹配样本不足20条（当前{strength_count}条）",
+            candidate_count=candidate_count,
+            regime_match_count=regime_count,
+            relative_strength_match_count=strength_count,
+        )
 
-    available = available.copy()
-    volatility_scale = max(abs(float(current["volatility_20"])), 0.10)
-    available["similarity_distance"] = (
-        available["probability"] - float(current["probability"])
-    ).abs() + 0.25 * (
-        available["volatility_20"] - float(current["volatility_20"])
-    ).abs() / volatility_scale
-    return available.nsmallest(ANALOG_COUNT, "similarity_distance")
+    state = same_strength.loc[:, ANALOG_FEATURES].astype(float)
+    current_state = current.loc[list(ANALOG_FEATURES)].astype(float)
+    scale = state.quantile(0.75) - state.quantile(0.25)
+    fallback_scale = state.std(ddof=0)
+    scale = scale.mask(scale <= 1e-12, fallback_scale).mask(lambda values: values <= 1e-12, 1.0)
+    standardized = (state - current_state) / scale
+    same_strength = same_strength.copy()
+    same_strength["similarity_distance"] = np.sqrt(standardized.pow(2).mean(axis=1))
+    close_enough = same_strength[
+        same_strength["similarity_distance"].le(MAX_SIMILARITY_DISTANCE)
+    ].sort_values("similarity_distance")
+    distance_count = len(close_enough)
+    if distance_count < MIN_ANALOG_COUNT:
+        return _selection_result(
+            pool,
+            reason=f"完整状态距离合格样本不足20条（当前{distance_count}条）",
+            candidate_count=candidate_count,
+            regime_match_count=regime_count,
+            relative_strength_match_count=strength_count,
+            distance_match_count=distance_count,
+        )
+
+    timeline_positions = {pd.Timestamp(date): position for position, date in enumerate(timeline)}
+    selected_dates: list[pd.Timestamp] = []
+    selected_positions: list[int] = []
+    for date in close_enough.index:
+        timestamp = pd.Timestamp(date)
+        position = timeline_positions[timestamp]
+        if all(abs(position - selected) >= horizon for selected in selected_positions):
+            selected_dates.append(timestamp)
+            selected_positions.append(position)
+        if len(selected_dates) >= ANALOG_COUNT:
+            break
+    selected = close_enough.loc[selected_dates].copy()
+    reason = (
+        ""
+        if len(selected) >= MIN_ANALOG_COUNT
+        else f"去除{horizon}日重叠路径后有效样本不足20条（当前{len(selected)}条）"
+    )
+    selected.attrs["selection"] = {
+        "unavailable_reason": reason,
+        "candidate_count": candidate_count,
+        "regime_match_count": regime_count,
+        "relative_strength_match_count": strength_count,
+        "distance_match_count": distance_count,
+        "effective_sample_count": len(selected),
+        "maximum_similarity_distance": (
+            float(selected["similarity_distance"].max()) if not selected.empty else None
+        ),
+    }
+    return selected
+
+
+def _selection_result(
+    pool: pd.DataFrame,
+    *,
+    reason: str,
+    candidate_count: int = 0,
+    regime_match_count: int = 0,
+    relative_strength_match_count: int = 0,
+    distance_match_count: int = 0,
+) -> pd.DataFrame:
+    result = pool.iloc[0:0].copy()
+    result.attrs["selection"] = {
+        "unavailable_reason": reason,
+        "candidate_count": candidate_count,
+        "regime_match_count": regime_match_count,
+        "relative_strength_match_count": relative_strength_match_count,
+        "distance_match_count": distance_match_count,
+        "effective_sample_count": 0,
+        "maximum_similarity_distance": None,
+    }
+    return result
 
 
 def _summarize_horizon(
@@ -128,12 +237,23 @@ def _summarize_horizon(
     horizon: int,
     validation: dict,
 ) -> dict:
+    selection = analogs.attrs.get("selection", {})
     returns = analogs[f"future_return_{horizon}"].dropna().astype(float)
     downside = analogs[f"worst_return_{horizon}"].dropna().astype(float)
-    if returns.empty:
+    if len(returns) < MIN_ANALOG_COUNT:
         return {
-            "sample_count": 0,
-            "evidence_status": "unavailable",
+            "sample_count": int(len(returns)),
+            "effective_sample_count": int(len(returns)),
+            "evidence_status": "unavailable" if returns.empty else "insufficient",
+            "unavailable_reason": selection.get(
+                "unavailable_reason",
+                f"有效非重叠样本不足20条（当前{len(returns)}条）",
+            ),
+            "candidate_count": int(selection.get("candidate_count", 0)),
+            "regime_match_count": int(selection.get("regime_match_count", 0)),
+            "relative_strength_match_count": int(selection.get("relative_strength_match_count", 0)),
+            "distance_match_count": int(selection.get("distance_match_count", 0)),
+            "maximum_similarity_distance": selection.get("maximum_similarity_distance"),
             "mean_return": None,
             "median_return": None,
             "return_p10": None,
@@ -167,7 +287,14 @@ def _summarize_horizon(
     ].dropna()
     return {
         "sample_count": int(len(returns)),
-        "evidence_status": ("sufficient" if len(returns) >= MIN_ANALOG_COUNT else "insufficient"),
+        "effective_sample_count": int(len(returns)),
+        "evidence_status": "sufficient",
+        "unavailable_reason": "",
+        "candidate_count": int(selection.get("candidate_count", 0)),
+        "regime_match_count": int(selection.get("regime_match_count", 0)),
+        "relative_strength_match_count": int(selection.get("relative_strength_match_count", 0)),
+        "distance_match_count": int(selection.get("distance_match_count", 0)),
+        "maximum_similarity_distance": selection.get("maximum_similarity_distance"),
         "mean_return": float(returns.mean()),
         "median_return": median_return,
         "return_p10": return_p10,
@@ -199,7 +326,7 @@ def _validate_analogs(frame: pd.DataFrame, horizon: int) -> dict:
     records: list[tuple[float, float, float, float]] = []
     for date, row in tests.iterrows():
         pool = frame[frame["model_kind"].eq(CALIBRATED_MODEL) & frame[known_column].lt(date)]
-        analogs = _select_analogs(pool, row)
+        analogs = _select_analogs(pool, row, horizon, frame.index)
         values = analogs[actual_column].dropna().astype(float)
         if len(values) < MIN_ANALOG_COUNT:
             continue
@@ -291,16 +418,30 @@ def _model_validation(frame: pd.DataFrame) -> dict:
     }
 
 
-def _sell_indicators(frame: pd.DataFrame, forecasts: dict[str, dict]) -> dict:
+def _sell_indicators(
+    frame: pd.DataFrame,
+    forecasts: dict[str, dict],
+    model_validation: dict,
+) -> dict:
     current = frame.iloc[-1]
     ten_day = forecasts["10"]
     probability = float(current["probability"])
     market_trend = float(current["market_trend_120"])
     thresholds = _sell_thresholds(SELL_RULE)
-    if current["model_kind"] != CALIBRATED_MODEL or ten_day["evidence_status"] != "sufficient":
+    if bool(current.get("is_out_of_distribution", False)):
+        unavailable_reason = f"当前状态处于训练分布外：{current.get('ood_features', '')}"
+    elif model_validation["status"] != "validated":
+        unavailable_reason = f"模型验证状态为{model_validation['status']}，卖出指标仅观察且不可执行"
+    elif current["model_kind"] != CALIBRATED_MODEL:
+        unavailable_reason = "当前没有可用的校准模型"
+    elif ten_day["evidence_status"] != "sufficient":
+        unavailable_reason = ten_day["unavailable_reason"]
+    else:
+        unavailable_reason = ""
+    if unavailable_reason:
         return {
             "action": "unavailable",
-            "reason": "当前没有至少20条可用的校准相似样本",
+            "reason": unavailable_reason,
             "review_horizon_trading_days": 1,
             "risk_control_price": None,
             "take_profit_price": None,
@@ -348,7 +489,7 @@ def _validate_sell_rule(frame: pd.DataFrame) -> dict:
     records: list[dict[str, float | str]] = []
     for date, row in tests.iterrows():
         pool = frame[frame["model_kind"].eq(CALIBRATED_MODEL) & frame[known_column].lt(date)]
-        analogs = _select_analogs(pool, row)
+        analogs = _select_analogs(pool, row, horizon, frame.index)
         returns = analogs[actual_column].dropna().astype(float)
         if len(returns) < MIN_ANALOG_COUNT:
             continue
@@ -434,6 +575,25 @@ def _sell_thresholds(config: SellRuleConfig) -> dict:
         "watch_loss_probability_trigger": config.watch_loss_probability,
         "reduce_loss_probability_trigger": config.reduce_loss_probability,
         "exit_loss_probability_trigger": config.exit_loss_probability,
+    }
+
+
+def _execution_gate(current: pd.Series, model_validation: dict) -> dict:
+    """在逐日成熟样本门控落地前，固定定投是唯一可执行模拟。"""
+    reasons = ["尚未实现逐日成熟样本质量门控，禁止模型自动调整仓位"]
+    if model_validation["status"] != "validated":
+        reasons.append(f"当前样本外验证状态：{model_validation['status']}")
+    if bool(current.get("is_out_of_distribution", False)):
+        reasons.append(f"当前训练分布外特征：{current.get('ood_features', '')}")
+    return {
+        "status": "blocked",
+        "policy": "fixed_dca_only",
+        "model_control_enabled": False,
+        "executable_target_weight": 1.0,
+        "research_target_weight": float(
+            current.get("research_target_weight", current["target_weight"])
+        ),
+        "reasons": reasons,
     }
 
 

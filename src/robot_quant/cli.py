@@ -22,6 +22,8 @@ def main(argv: Sequence[str] | None = None) -> None:
             output_root=args.output_root,
         )
         print(
-            f"{state['market_date']} | 预测概率 {state['prediction_probability']:.2%} | "
-            f"目标仓位 {state['next_target_weight']:.0%}"
+            f"{state['market_date']} | 10日相对研究概率 "
+            f"{state['prediction_probability']:.2%} | "
+            f"研究仓位 {state['research_target_weight']:.0%}（不可执行） | "
+            f"固定定投仓位 {state['executable_target_weight']:.0%}"
         )

@@ -57,17 +57,27 @@ def test_run_daily_is_idempotent_and_writes_observable_results(tmp_path) -> None
     assert history.iloc[0]["contribution"] == 15_000.0
     assert history.iloc[0]["executed_target_weight"] == 1.0
     assert history.iloc[0]["strategy_shares"] > 0
+    assert history["executed_target_weight"].eq(1.0).all()
+    assert state["execution_policy"] == "fixed_dca_only"
+    assert state["model_control_enabled"] is False
+    assert state["executable_target_weight"] == 1.0
+    assert state["strategy_value"] == state["baseline_value"]
     assert set(state["forecast_horizons"]) == {"5", "10", "20"}
     for forecast in state["forecast_horizons"].values():
-        assert forecast["sample_count"] > 0
-        assert forecast["return_p10"] <= forecast["median_return"]
-        assert forecast["median_return"] <= forecast["return_p90"]
-        assert 0.0 <= forecast["loss_probability"] <= 1.0
-        assert 0.0 <= forecast["validation_interval_coverage"] <= 1.0
-    assert state["sell_indicators"]["action"] in {"hold", "watch", "reduce", "exit"}
-    assert state["sell_indicators"]["risk_control_price"] <= state["etf_close"]
-    assert state["sell_indicators"]["take_profit_price"] >= state["etf_close"]
-    assert state["sell_rule_validation"]["sample_count"] > 0
+        assert forecast["sample_count"] <= 40
+        if forecast["evidence_status"] == "sufficient":
+            assert forecast["return_p10"] <= forecast["median_return"]
+            assert forecast["median_return"] <= forecast["return_p90"]
+            assert 0.0 <= forecast["loss_probability"] <= 1.0
+        if forecast["validation_interval_coverage"] is not None:
+            assert 0.0 <= forecast["validation_interval_coverage"] <= 1.0
+    assert state["sell_indicators"]["action"] in {
+        "hold",
+        "watch",
+        "reduce",
+        "exit",
+        "unavailable",
+    }
     for evidence in state["sell_rule_validation"]["actions"].values():
         assert evidence["sample_count"] > 0
         assert 0.0 <= evidence["actual_loss_probability_10"] <= 1.0
@@ -78,8 +88,12 @@ def test_run_daily_is_idempotent_and_writes_observable_results(tmp_path) -> None
     )
     report = (output_dir / "reports" / "latest.md").read_text()
     assert "未来10个交易日跑赢沪深300的预测概率" in report
+    assert "未来10日相对沪深300研究信号" in report
+    assert "下一交易日执行计划" in report
+    assert "下一交易日预测" not in report
+    assert "固定定投是唯一可执行模拟" in report
     assert "预估收益与下跌风险" in report
-    assert "模拟卖出指标" in report
+    assert "研究型卖出指标" in report
     assert "卖出规则历史验证" in report
     assert "样本外验证" in report
     assert "上涨并跑赢" not in report
