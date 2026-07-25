@@ -49,11 +49,19 @@ def test_walk_forward_predictions_do_not_change_when_future_prices_change() -> N
         original.loc[original.index < future_start, "probability"],
         changed.loc[changed.index < future_start, "probability"],
     )
+    pdt.assert_series_equal(
+        original.loc[original.index < future_start, "quality_gate_passed"],
+        changed.loc[changed.index < future_start, "quality_gate_passed"],
+    )
+    pdt.assert_series_equal(
+        original.loc[original.index < future_start, "shadow_target_weight"],
+        changed.loc[changed.index < future_start, "shadow_target_weight"],
+    )
     assert set(original["target_weight"].unique()).issubset({0.0, 0.5, 1.0})
     assert original["probability"].between(0.0, 1.0).all()
 
 
-def test_walk_forward_predictions_expose_gap_calibrated_and_raw_probabilities() -> None:
+def test_walk_forward_predictions_expose_shrunk_score_and_mature_quality_gate() -> None:
     robot, benchmark = _price_frame(periods=520)
     predictor = WalkForwardPredictor(
         PredictionConfig(
@@ -65,16 +73,21 @@ def test_walk_forward_predictions_expose_gap_calibrated_and_raw_probabilities() 
     )
 
     predictions = predictor.predict_history(robot, benchmark)
-    calibrated = predictions[predictions["model_kind"] == "calibrated_logistic_regression"]
+    robust = predictions[predictions["model_kind"] == "shrunk_logistic_regression"]
 
     assert "raw_probability" in predictions.columns
-    assert not calibrated.empty
-    assert calibrated["probability"].between(0.0, 1.0).all()
-    assert calibrated["raw_probability"].between(0.0, 1.0).all()
-    assert not np.allclose(
-        calibrated["probability"].to_numpy(),
-        calibrated["raw_probability"].to_numpy(),
+    assert not robust.empty
+    assert robust["probability"].between(0.0, 1.0).all()
+    assert robust["raw_probability"].between(0.0, 1.0).all()
+    assert np.allclose(
+        robust["probability"].to_numpy(),
+        0.5
+        + robust["probability_shrinkage"].to_numpy() * (robust["raw_probability"].to_numpy() - 0.5),
     )
+    assert {"quality_gate_passed", "quality_gate_reason", "shadow_target_weight"}.issubset(
+        predictions.columns
+    )
+    assert predictions["shadow_target_weight"].between(0.0, 0.2).all()
 
 
 def test_walk_forward_marks_extreme_latest_state_as_out_of_distribution() -> None:
@@ -100,4 +113,9 @@ def test_walk_forward_marks_extreme_latest_state_as_out_of_distribution() -> Non
     assert "1pct" not in latest["ood_features"]
     assert "5pct" in latest["ood_features"] or "95pct" in latest["ood_features"]
     assert latest["signal_status"] == "out_of_distribution"
+    assert bool(latest["quality_gate_passed"]) is False
+    assert latest["shadow_target_weight"] == 0.0
     assert "research_target_weight" in predictions.columns
+    assert latest["ood_training_sample_count"] > 0
+    for feature in predictor.FEATURE_COLUMNS:
+        assert latest[f"{feature}_ood_lower"] < latest[f"{feature}_ood_upper"]

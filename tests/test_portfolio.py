@@ -50,9 +50,7 @@ def test_monthly_contribution_occurs_once_on_first_trading_day() -> None:
             "close": [10.0, 10.0, 10.0, 10.0],
             "target_weight": [1.0, 1.0, 1.0, 1.0],
         },
-        index=pd.to_datetime(
-            ["2026-01-30", "2026-02-02", "2026-02-03", "2026-03-02"]
-        ),
+        index=pd.to_datetime(["2026-01-30", "2026-02-02", "2026-02-03", "2026-03-02"]),
     )
     simulator = _simulator()
 

@@ -58,11 +58,23 @@ def test_run_daily_is_idempotent_and_writes_observable_results(tmp_path) -> None
     assert history.iloc[0]["executed_target_weight"] == 1.0
     assert history.iloc[0]["strategy_shares"] > 0
     assert history["executed_target_weight"].eq(1.0).all()
+    assert {
+        "shadow_target_weight",
+        "shadow_portfolio_value",
+        "shadow_nav",
+    }.issubset(history.columns)
     assert state["execution_policy"] == "fixed_dca_only"
     assert state["model_control_enabled"] is False
     assert state["executable_target_weight"] == 1.0
     assert state["approved_probability"] == 0.5
     assert state["strategy_value"] == state["baseline_value"]
+    assert state["shadow_validation"]["status"] == "observation_only"
+    assert state["shadow_value_difference"] == state["shadow_value"] - state["baseline_value"]
+    assert state["shadow_active_days"] >= 0
+    assert state["training_oof_sample_count"] > 0
+    assert "training_oof_passed" in state
+    assert state["data_provenance"]["forecast_outcomes"] == "robot_index"
+    assert len(state["data_provenance"]["known_methodology_breaks"]) == 2
     assert state["strategy_validation"] == {
         "status": "baseline_only",
         "model_excess_value": 0.0,
@@ -100,6 +112,8 @@ def test_run_daily_is_idempotent_and_writes_observable_results(tmp_path) -> None
     assert "brier_skill_score" in state["model_validation"]
     assert "passes_brier_baseline" in state["model_validation"]
     assert "stability_windows" in state["model_validation"]
+    assert len(state["model_validation"]["regime_windows"]) == 4
+    assert "passes_regime_stability" in state["model_validation"]
     assert (
         state["model_validation"]["confidence_sample_count"]
         <= state["model_validation"]["calibrated_sample_count"]
@@ -121,11 +135,17 @@ def test_run_daily_is_idempotent_and_writes_observable_results(tmp_path) -> None
     assert "基线优先门控" in report
     assert "回顾性挑战者" in report
     assert "当前不具备可验证的交易Alpha" in report
+    assert "质量门控影子策略（不可执行）" in report
+    assert "影子Alpha" in report
+    assert "逐日成熟样本门控" in report
     assert "零收益基线门控" in report
     assert "模型分段稳定性" in report
     assert "独立样本" in report
     assert "方向倒挂" in report
     assert "预估收益与下跌风险" in report
+    assert "宽口径历史压力参考（不可执行）" in report
+    assert "不是当前行情预测" in report
+    assert "已隐藏无效的“不可用”空表" in report
     assert "研究型卖出指标" in report
     assert "卖出规则历史验证" in report
     assert "样本外验证" in report

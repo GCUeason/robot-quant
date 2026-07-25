@@ -14,7 +14,10 @@ from robot_quant.model import WalkForwardPredictor
 HORIZONS = (5, 10, 20)
 ANALOG_COUNT = 40
 MIN_ANALOG_COUNT = 20
-CALIBRATED_MODEL = "calibrated_logistic_regression"
+RESEARCH_MODEL_KINDS = {
+    "calibrated_logistic_regression",
+    WalkForwardPredictor.MODEL_KIND,
+}
 RELATIVE_STRENGTH_TOLERANCE = 0.03
 MAX_SIMILARITY_DISTANCE = 3.0
 ANALOG_FEATURES = WalkForwardPredictor.FEATURE_COLUMNS
@@ -44,11 +47,14 @@ def build_forecast_indicators(
     etf: pd.DataFrame,
     predictions: pd.DataFrame,
     capital: float,
+    reference_prices: pd.DataFrame | None = None,
+    outcome_source: str = "etf",
 ) -> dict:
     """用当时已经实现的相似状态构造透明的条件收益分布。"""
-    frame = predictions.join(etf[["close"]], how="inner").sort_index()
+    outcome_prices = etf if reference_prices is None else reference_prices
+    frame = predictions.join(outcome_prices[["close"]], how="inner").sort_index()
     if frame.empty:
-        raise ValueError("预测与ETF行情没有重合日期")
+        raise ValueError("预测与结果参考行情没有重合日期")
 
     for horizon in HORIZONS:
         frame[f"future_return_{horizon}"] = frame["close"].shift(-horizon) / frame["close"] - 1.0
@@ -62,18 +68,22 @@ def build_forecast_indicators(
 
     current = frame.iloc[-1]
     current_date = frame.index[-1]
+    current_etf = etf.loc[etf.index <= current_date]
+    if current_etf.empty:
+        raise ValueError("ETF行情缺少当前价格")
+    current_etf_close = float(current_etf.iloc[-1]["close"])
     forecasts: dict[str, dict] = {}
     for horizon in HORIZONS:
         known = frame[
             frame[f"known_date_{horizon}"].le(current_date)
-            & frame["model_kind"].eq(CALIBRATED_MODEL)
+            & frame["model_kind"].isin(RESEARCH_MODEL_KINDS)
         ]
-        if current["model_kind"] != CALIBRATED_MODEL:
+        if current["model_kind"] not in RESEARCH_MODEL_KINDS:
             known = known.iloc[0:0]
         analogs = _select_analogs(known, current, horizon, frame.index)
         forecasts[str(horizon)] = _summarize_horizon(
             analogs=analogs,
-            current_close=float(current["close"]),
+            current_close=current_etf_close,
             capital=capital,
             horizon=horizon,
             validation=_validate_analogs(frame, horizon),
@@ -89,6 +99,13 @@ def build_forecast_indicators(
     )
     return {
         "forecast_horizons": forecasts,
+        "forecast_outcome_source": outcome_source,
+        "historical_risk_reference": _historical_risk_reference(
+            frame,
+            current,
+            current_date,
+        ),
+        "distribution_diagnostics": _distribution_diagnostics(current),
         "sell_indicators": sell_indicators,
         "sell_rule_validation": sell_rule_validation,
         "model_validation": model_validation,
@@ -105,6 +122,114 @@ def _future_downside(close: pd.Series, horizon: int) -> tuple[pd.Series, pd.Seri
         worst.iloc[position] = float(path.min())
         trough_day.iloc[position] = float(np.argmin(path.to_numpy()) + 1)
     return worst, trough_day
+
+
+def _historical_risk_reference(
+    frame: pd.DataFrame,
+    current: pd.Series,
+    current_date: pd.Timestamp,
+) -> dict[str, dict]:
+    """提供宽口径历史基准；它不属于模型预测，也不获得交易权限。"""
+    references: dict[str, dict] = {}
+    timeline_positions = {pd.Timestamp(date): position for position, date in enumerate(frame.index)}
+    current_strength_sign = np.sign(float(current["relative_strength_20"]))
+
+    for horizon in HORIZONS:
+        return_column = f"future_return_{horizon}"
+        worst_column = f"worst_return_{horizon}"
+        trough_column = f"trough_day_{horizon}"
+        known_column = f"known_date_{horizon}"
+        pool = frame[
+            frame[known_column].le(current_date)
+            & frame[return_column].notna()
+            & frame["relative_strength_20"].notna()
+        ]
+        same_direction = pool[
+            np.sign(pool["relative_strength_20"].astype(float)) == current_strength_sign
+        ]
+        selected_dates: list[pd.Timestamp] = []
+        selected_positions: list[int] = []
+        for date in reversed(same_direction.index):
+            timestamp = pd.Timestamp(date)
+            position = timeline_positions[timestamp]
+            if all(
+                abs(position - selected_position) >= horizon
+                for selected_position in selected_positions
+            ):
+                selected_dates.append(timestamp)
+                selected_positions.append(position)
+            if len(selected_dates) >= ANALOG_COUNT:
+                break
+
+        selected = same_direction.loc[selected_dates]
+        returns = selected[return_column].dropna().astype(float)
+        downside = selected[worst_column].dropna().astype(float)
+        drawdown_events = selected.loc[selected[worst_column].lt(0.0), trough_column].dropna()
+        references[str(horizon)] = {
+            "reference_kind": "relative_strength_direction_history",
+            "status": "descriptive" if len(returns) >= MIN_ANALOG_COUNT else "limited",
+            "criteria": "机器人指数20日相对强弱方向相同；不要求完整特征位于训练分布内",
+            "scope_sample_count": int(len(same_direction)),
+            "sample_count": int(len(returns)),
+            "minimum_sample_count": MIN_ANALOG_COUNT,
+            "start_date": (
+                pd.Timestamp(selected.index.min()).strftime("%Y-%m-%d")
+                if not selected.empty
+                else None
+            ),
+            "end_date": (
+                pd.Timestamp(selected.index.max()).strftime("%Y-%m-%d")
+                if not selected.empty
+                else None
+            ),
+            "median_return": _optional_quantile(returns, 0.50),
+            "return_p10": _optional_quantile(returns, 0.10),
+            "return_p90": _optional_quantile(returns, 0.90),
+            "loss_probability": (float((returns < 0.0).mean()) if not returns.empty else None),
+            "drawdown_event_probability": (
+                float((downside < 0.0).mean()) if not downside.empty else None
+            ),
+            "drawdown_5pct_probability": (
+                float((downside <= -0.05).mean()) if not downside.empty else None
+            ),
+            "drawdown_event_sample_count": int(len(drawdown_events)),
+            "drawdown_trough_day_p25": _optional_quantile(drawdown_events, 0.25),
+            "drawdown_trough_day_p75": _optional_quantile(drawdown_events, 0.75),
+        }
+    return references
+
+
+def _distribution_diagnostics(current: pd.Series) -> list[dict]:
+    """输出当天值与模型实际使用的OOD训练边界。"""
+    diagnostics: list[dict] = []
+    training_sample_count = int(current.get("ood_training_sample_count", 0) or 0)
+    for feature in ANALOG_FEATURES:
+        lower = current.get(f"{feature}_ood_lower")
+        upper = current.get(f"{feature}_ood_upper")
+        value = current.get(feature)
+        if pd.isna(lower) or pd.isna(upper) or pd.isna(value):
+            continue
+        numeric_value = float(value)
+        numeric_lower = float(lower)
+        numeric_upper = float(upper)
+        status = (
+            "below"
+            if numeric_value < numeric_lower
+            else "above"
+            if numeric_value > numeric_upper
+            else "in_range"
+        )
+        diagnostics.append(
+            {
+                "feature": feature,
+                "current_value": numeric_value,
+                "lower_bound": numeric_lower,
+                "upper_bound": numeric_upper,
+                "status": status,
+                "training_sample_count": training_sample_count,
+            }
+        )
+    return diagnostics
 
 
 def _select_analogs(
@@ -358,7 +483,7 @@ def _unavailable_forecast(
 def _validate_analogs(frame: pd.DataFrame, horizon: int) -> dict:
     actual_column = f"future_return_{horizon}"
     known_column = f"known_date_{horizon}"
-    tests = frame[frame["model_kind"].eq(CALIBRATED_MODEL) & frame[actual_column].notna()]
+    tests = frame[frame["model_kind"].isin(RESEARCH_MODEL_KINDS) & frame[actual_column].notna()]
     records: list[tuple[float, float, float, float]] = []
     timeline_positions = {pd.Timestamp(date): position for position, date in enumerate(frame.index)}
     last_record_position: int | None = None
@@ -366,7 +491,7 @@ def _validate_analogs(frame: pd.DataFrame, horizon: int) -> dict:
         position = timeline_positions[pd.Timestamp(date)]
         if last_record_position is not None and position - last_record_position < horizon:
             continue
-        pool = frame[frame["model_kind"].eq(CALIBRATED_MODEL) & frame[known_column].lt(date)]
+        pool = frame[frame["model_kind"].isin(RESEARCH_MODEL_KINDS) & frame[known_column].lt(date)]
         analogs = _select_analogs(pool, row, horizon, frame.index)
         values = analogs[actual_column].dropna().astype(float)
         if len(values) < MIN_ANALOG_COUNT:
@@ -442,7 +567,9 @@ def assess_forecast_validation(records: pd.DataFrame) -> dict:
 
 
 def _model_validation(frame: pd.DataFrame) -> dict:
-    realized = frame[frame["model_kind"].eq(CALIBRATED_MODEL) & frame["realized_label"].notna()]
+    realized = frame[
+        frame["model_kind"].isin(RESEARCH_MODEL_KINDS) & frame["realized_label"].notna()
+    ]
     labels = realized["realized_label"].astype(int)
     probability = realized["probability"].astype(float)
     raw_probability = realized["raw_probability"].astype(float)
@@ -473,9 +600,14 @@ def _model_validation(frame: pd.DataFrame) -> dict:
     fixed_stability_windows = [
         window for window in stability_windows if window["window_kind"] == "fixed_block"
     ]
-    passes_stability = len(fixed_stability_windows) >= MIN_STABILITY_WINDOWS and all(
+    passes_time_stability = len(fixed_stability_windows) >= MIN_STABILITY_WINDOWS and all(
         window["passes"] for window in stability_windows
     )
+    regime_windows = _regime_windows(realized)
+    passes_regime_stability = len(regime_windows) == 4 and all(
+        regime["passes"] for regime in regime_windows
+    )
+    passes_stability = passes_time_stability and passes_regime_stability
 
     if count < 100:
         status = "insufficient_samples"
@@ -497,16 +629,22 @@ def _model_validation(frame: pd.DataFrame) -> dict:
         "accuracy_wilson95_low": interval[0],
         "accuracy_wilson95_high": interval[1],
         "calibrated_brier": calibrated_brier,
+        "score_brier": calibrated_brier,
         "raw_brier": raw_brier,
         "constant_50_brier": constant_brier,
         "brier_skill_score": brier_skill_score,
         "passes_brier_baseline": passes_brier_baseline,
         "passes_auc_baseline": passes_auc_baseline,
         "stability_windows": stability_windows,
+        "stability_window_count": len(fixed_stability_windows),
+        "stability_pass_count": sum(window["passes"] for window in fixed_stability_windows),
+        "passes_time_stability": passes_time_stability,
+        "regime_windows": regime_windows,
+        "passes_regime_stability": passes_regime_stability,
         "passes_stability": passes_stability,
         "roc_auc": auc,
         "status": status,
-        "calibration_method": "sigmoid_timeseries_gap10",
+        "calibration_method": "fixed_linear_shrinkage_to_50pct",
     }
 
 
@@ -548,6 +686,45 @@ def _stability_window_summary(window: pd.DataFrame, window_kind: str) -> dict:
     }
 
 
+def _regime_windows(realized: pd.DataFrame) -> list[dict]:
+    """按预注册的趋势方向与35%年化波动阈值审计环境泛化。"""
+    definitions = (
+        ("up_low_vol", True, False),
+        ("up_high_vol", True, True),
+        ("down_low_vol", False, False),
+        ("down_high_vol", False, True),
+    )
+    windows: list[dict] = []
+    for name, market_up, high_volatility in definitions:
+        market_mask = realized["market_trend_120"].ge(0.0) == market_up
+        volatility_mask = realized["volatility_20"].ge(0.35) == high_volatility
+        window = realized.loc[market_mask & volatility_mask]
+        labels = window["realized_label"].astype(int)
+        scores = window["probability"].astype(float)
+        sample_count = len(window)
+        brier = float(((scores - labels) ** 2).mean()) if sample_count else None
+        auc = (
+            float(roc_auc_score(labels, scores)) if sample_count and labels.nunique() == 2 else None
+        )
+        enough_samples = sample_count >= MIN_STABILITY_WINDOW_SAMPLES
+        windows.append(
+            {
+                "regime": name,
+                "sample_count": sample_count,
+                "brier": brier,
+                "roc_auc": auc,
+                "passes": (
+                    enough_samples
+                    and brier is not None
+                    and brier < 0.25
+                    and auc is not None
+                    and auc > 0.5
+                ),
+            }
+        )
+    return windows
+
+
 def _sell_indicators(
     frame: pd.DataFrame,
     forecasts: dict[str, dict],
@@ -563,8 +740,8 @@ def _sell_indicators(
         unavailable_reason = f"当前状态处于训练分布外：{current.get('ood_features', '')}"
     elif model_validation["status"] != "validated":
         unavailable_reason = f"模型验证状态为{model_validation['status']}，卖出指标仅观察且不可执行"
-    elif current["model_kind"] != CALIBRATED_MODEL:
-        unavailable_reason = "当前没有可用的校准模型"
+    elif current["model_kind"] not in RESEARCH_MODEL_KINDS:
+        unavailable_reason = "当前没有可用的稳健研究模型"
     elif ten_day["evidence_status"] != "sufficient":
         unavailable_reason = ten_day["unavailable_reason"]
     elif sell_rule_validation["status"] != "validated":
@@ -618,7 +795,7 @@ def _validate_sell_rule(frame: pd.DataFrame) -> dict:
     horizon = 10
     actual_column = f"future_return_{horizon}"
     known_column = f"known_date_{horizon}"
-    tests = frame[frame["model_kind"].eq(CALIBRATED_MODEL) & frame[actual_column].notna()]
+    tests = frame[frame["model_kind"].isin(RESEARCH_MODEL_KINDS) & frame[actual_column].notna()]
     records: list[dict[str, float | str]] = []
     timeline_positions = {pd.Timestamp(date): position for position, date in enumerate(frame.index)}
     last_record_position: int | None = None
@@ -626,7 +803,7 @@ def _validate_sell_rule(frame: pd.DataFrame) -> dict:
         position = timeline_positions[pd.Timestamp(date)]
         if last_record_position is not None and position - last_record_position < horizon:
             continue
-        pool = frame[frame["model_kind"].eq(CALIBRATED_MODEL) & frame[known_column].lt(date)]
+        pool = frame[frame["model_kind"].isin(RESEARCH_MODEL_KINDS) & frame[known_column].lt(date)]
         analogs = _select_analogs(pool, row, horizon, frame.index)
         returns = analogs[actual_column].dropna().astype(float)
         if len(returns) < MIN_ANALOG_COUNT:
@@ -776,11 +953,11 @@ def _classify_sell_action(
         and median_return < 0.0
         and loss_probability >= config.exit_loss_probability
     ):
-        return "exit", "校准概率、条件收益和下跌概率同时触发退出阈值"
+        return "exit", "收缩后概率型分数、条件收益和下跌概率同时触发退出阈值"
     if probability < config.reduce_probability or (
         median_return < 0.0 and loss_probability >= config.reduce_loss_probability
     ):
-        return "reduce", "校准概率或10日条件收益触发减仓阈值"
+        return "reduce", "收缩后概率型分数或10日条件收益触发减仓阈值"
     if loss_probability >= config.watch_loss_probability or market_trend < 0.0:
         return "watch", "大盘趋势或条件下跌概率要求继续观察"
     return "hold", "当前未触发减仓或退出阈值"
@@ -797,8 +974,10 @@ def _sell_thresholds(config: SellRuleConfig) -> dict:
 
 
 def _execution_gate(current: pd.Series, model_validation: dict) -> dict:
-    """在逐日成熟样本门控落地前，固定定投是唯一可执行模拟。"""
-    reasons = ["尚未实现逐日成熟样本质量门控，禁止模型自动调整仓位"]
+    """逐日门控只控制影子账户；实盘权限仍需长期样本外Alpha。"""
+    reasons = ["回顾性挑战者尚未用新增数据证明长期优于固定定投"]
+    if not bool(current.get("quality_gate_passed", False)):
+        reasons.append(f"逐日成熟样本门控未通过：{current.get('quality_gate_reason', '')}")
     if model_validation["status"] != "validated":
         reasons.append(f"当前样本外验证状态：{model_validation['status']}")
     if bool(current.get("is_out_of_distribution", False)):
