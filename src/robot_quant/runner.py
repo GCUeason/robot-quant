@@ -49,6 +49,9 @@ def run_daily(
     predictor = WalkForwardPredictor(PredictionConfig())
     predictions = predictor.predict_history(bundle.robot_index, bundle.benchmark)
     research_execution = build_execution_frame(bundle.etf, predictions)
+    shadow_signals = predictions.copy()
+    shadow_signals["target_weight"] = shadow_signals["shadow_target_weight"]
+    shadow_execution = build_execution_frame(bundle.etf, shadow_signals)
     execution = research_execution.copy()
     execution["target_weight"] = 1.0
 
@@ -61,6 +64,8 @@ def run_daily(
         etf=bundle.etf,
         predictions=predictions,
         capital=plan.initial_contribution,
+        reference_prices=bundle.robot_index,
+        outcome_source="robot_index",
     )
     simulator = PortfolioSimulator(portfolio_config)
     simulation_execution = execution.loc[execution.index >= plan.start_date].copy()
@@ -72,6 +77,7 @@ def run_daily(
             plan,
         )
         state.update(indicators)
+        state["data_provenance"] = _data_provenance(bundle)
         write_outputs(history, state, output_path)
         return state
 
@@ -80,6 +86,10 @@ def run_daily(
         simulation_execution.columns.get_loc("target_weight"),
     ] = plan.initial_target_weight
     strategy = simulator.run(simulation_execution)
+    simulation_shadow_execution = shadow_execution.loc[
+        shadow_execution.index >= plan.start_date
+    ].copy()
+    shadow = simulator.run(simulation_shadow_execution)
     simulation_etf = bundle.etf.loc[bundle.etf.index >= plan.start_date]
     baseline_execution = simulation_etf.loc[:, ["open", "close"]].copy()
     baseline_execution["target_weight"] = 1.0
@@ -91,6 +101,8 @@ def run_daily(
         execution=simulation_execution,
         strategy=strategy,
         baseline=baseline,
+        shadow_execution=simulation_shadow_execution,
+        shadow=shadow,
     )
     state = _latest_state(
         history,
@@ -98,6 +110,7 @@ def run_daily(
         plan,
     )
     state.update(indicators)
+    state["data_provenance"] = _data_provenance(bundle)
     write_outputs(history, state, output_path)
     return state
 
@@ -108,6 +121,8 @@ def _combine_history(
     execution: pd.DataFrame,
     strategy: pd.DataFrame,
     baseline: pd.DataFrame,
+    shadow_execution: pd.DataFrame,
+    shadow: pd.DataFrame,
 ) -> pd.DataFrame:
     history = pd.DataFrame(index=etf.index)
     history["etf_open"] = etf["open"].astype(float)
@@ -117,10 +132,16 @@ def _combine_history(
     history["research_target_weight"] = aligned_predictions["research_target_weight"]
     history["next_target_weight"] = 1.0
     history["executed_target_weight"] = execution["target_weight"]
+    history["shadow_target_weight"] = shadow_execution["target_weight"]
+    history["quality_gate_passed"] = aligned_predictions["quality_gate_passed"].astype(bool)
     history["contribution"] = strategy["contribution"]
     history["total_contributions"] = strategy["total_contributions"]
 
-    for prefix, account in (("strategy", strategy), ("baseline", baseline)):
+    for prefix, account in (
+        ("strategy", strategy),
+        ("baseline", baseline),
+        ("shadow", shadow),
+    ):
         history[f"{prefix}_cash"] = account["cash"]
         history[f"{prefix}_shares"] = account["shares"]
         history[f"{prefix}_portfolio_value"] = account["portfolio_value"]
@@ -145,6 +166,7 @@ def _latest_state(
     contributions = float(latest["total_contributions"])
     strategy_value = float(latest["strategy_portfolio_value"])
     baseline_value = float(latest["baseline_portfolio_value"])
+    shadow_value = float(latest["shadow_portfolio_value"])
 
     return {
         "simulation_status": "active",
@@ -153,6 +175,7 @@ def _latest_state(
         "etf_close": float(latest["etf_close"]),
         "raw_prediction_probability": float(latest_prediction["raw_probability"]),
         "prediction_probability": float(latest_prediction["probability"]),
+        "probability_shrinkage": float(latest_prediction["probability_shrinkage"]),
         "approved_probability": 0.5,
         "research_target_weight": float(latest_prediction["research_target_weight"]),
         "next_target_weight": 1.0,
@@ -165,6 +188,16 @@ def _latest_state(
         "model_kind": str(latest_prediction["model_kind"]),
         "model_version": str(latest_prediction["model_version"]),
         "model_selection_status": str(latest_prediction["model_selection_status"]),
+        "training_oof_sample_count": int(latest_prediction["training_oof_sample_count"]),
+        "training_oof_brier": _optional_float(latest_prediction["training_oof_brier"]),
+        "training_oof_auc": _optional_float(latest_prediction["training_oof_auc"]),
+        "training_oof_passed": bool(latest_prediction["training_oof_passed"]),
+        "quality_gate_sample_count": int(latest_prediction["quality_gate_sample_count"]),
+        "quality_gate_brier": _optional_float(latest_prediction["quality_gate_brier"]),
+        "quality_gate_auc": _optional_float(latest_prediction["quality_gate_auc"]),
+        "quality_gate_passed": bool(latest_prediction["quality_gate_passed"]),
+        "quality_gate_reason": str(latest_prediction["quality_gate_reason"]),
+        "shadow_target_weight": float(latest_prediction["shadow_target_weight"]),
         "prediction_accuracy": _prediction_accuracy(predictions),
         "initial_contribution": plan.initial_contribution,
         "initial_target_weight": plan.initial_target_weight,
@@ -180,6 +213,18 @@ def _latest_state(
         "baseline_max_drawdown": _max_drawdown(history["baseline_nav"]),
         "strategy_value_difference": strategy_value - baseline_value,
         "strategy_validation": _strategy_validation(strategy_value, baseline_value),
+        "shadow_value": shadow_value,
+        "shadow_profit": shadow_value - contributions,
+        "shadow_roi": shadow_value / contributions - 1.0,
+        "shadow_max_drawdown": _max_drawdown(history["shadow_nav"]),
+        "shadow_value_difference": shadow_value - baseline_value,
+        "shadow_active_days": int(history["shadow_target_weight"].gt(0.0).sum()),
+        "shadow_gate_pass_days": int(history["quality_gate_passed"].sum()),
+        "shadow_validation": _shadow_validation(
+            shadow_value,
+            baseline_value,
+            len(history),
+        ),
     }
 
 
@@ -196,6 +241,7 @@ def _pending_state(
         "etf_close": float(etf.iloc[-1]["close"]),
         "raw_prediction_probability": float(latest_prediction["raw_probability"]),
         "prediction_probability": float(latest_prediction["probability"]),
+        "probability_shrinkage": float(latest_prediction["probability_shrinkage"]),
         "approved_probability": 0.5,
         "research_target_weight": float(latest_prediction["research_target_weight"]),
         "next_target_weight": 1.0,
@@ -208,6 +254,16 @@ def _pending_state(
         "model_kind": str(latest_prediction["model_kind"]),
         "model_version": str(latest_prediction["model_version"]),
         "model_selection_status": str(latest_prediction["model_selection_status"]),
+        "training_oof_sample_count": int(latest_prediction["training_oof_sample_count"]),
+        "training_oof_brier": _optional_float(latest_prediction["training_oof_brier"]),
+        "training_oof_auc": _optional_float(latest_prediction["training_oof_auc"]),
+        "training_oof_passed": bool(latest_prediction["training_oof_passed"]),
+        "quality_gate_sample_count": int(latest_prediction["quality_gate_sample_count"]),
+        "quality_gate_brier": _optional_float(latest_prediction["quality_gate_brier"]),
+        "quality_gate_auc": _optional_float(latest_prediction["quality_gate_auc"]),
+        "quality_gate_passed": bool(latest_prediction["quality_gate_passed"]),
+        "quality_gate_reason": str(latest_prediction["quality_gate_reason"]),
+        "shadow_target_weight": float(latest_prediction["shadow_target_weight"]),
         "prediction_accuracy": _prediction_accuracy(predictions),
         "initial_contribution": plan.initial_contribution,
         "initial_target_weight": plan.initial_target_weight,
@@ -223,6 +279,14 @@ def _pending_state(
         "baseline_max_drawdown": None,
         "strategy_value_difference": 0.0,
         "strategy_validation": _strategy_validation(0.0, 0.0),
+        "shadow_value": 0.0,
+        "shadow_profit": 0.0,
+        "shadow_roi": None,
+        "shadow_max_drawdown": None,
+        "shadow_value_difference": 0.0,
+        "shadow_active_days": 0,
+        "shadow_gate_pass_days": 0,
+        "shadow_validation": _shadow_validation(0.0, 0.0, 0),
     }
 
 
@@ -243,6 +307,41 @@ def _strategy_validation(strategy_value: float, baseline_value: float) -> dict:
     }
 
 
+def _shadow_validation(shadow_value: float, baseline_value: float, sample_days: int) -> dict:
+    return {
+        "status": "observation_only",
+        "sample_days": sample_days,
+        "model_excess_value": shadow_value - baseline_value,
+        "reason": "影子策略仅用于衡量逐日成熟样本门控，不具备交易授权",
+    }
+
+
+def _data_provenance(bundle) -> dict:
+    return {
+        "etf": bundle.etf_source,
+        "model_features": bundle.robot_index_source,
+        "forecast_outcomes": "robot_index",
+        "benchmark": bundle.benchmark_source,
+        "robot_index_start": bundle.robot_index.index.min().strftime("%Y-%m-%d"),
+        "robot_index_end": bundle.robot_index.index.max().strftime("%Y-%m-%d"),
+        "robot_index_sample_count": len(bundle.robot_index),
+        "known_methodology_breaks": [
+            {
+                "effective_date": "2023-03-03",
+                "reason": "指数代码及选样、权重规则修订",
+            },
+            {
+                "effective_date": "2025-04-10",
+                "reason": "样本数量、选样空间及权重规则修订",
+            },
+        ],
+    }
+
+
+def _optional_float(value) -> float | None:
+    return None if pd.isna(value) else float(value)
+
+
 def _empty_history() -> pd.DataFrame:
     columns = [
         "etf_open",
@@ -251,6 +350,8 @@ def _empty_history() -> pd.DataFrame:
         "research_target_weight",
         "next_target_weight",
         "executed_target_weight",
+        "shadow_target_weight",
+        "quality_gate_passed",
         "contribution",
         "total_contributions",
         "strategy_cash",
@@ -261,6 +362,10 @@ def _empty_history() -> pd.DataFrame:
         "baseline_shares",
         "baseline_portfolio_value",
         "baseline_nav",
+        "shadow_cash",
+        "shadow_shares",
+        "shadow_portfolio_value",
+        "shadow_nav",
     ]
     return pd.DataFrame(columns=columns, index=pd.DatetimeIndex([], name="date"))
 

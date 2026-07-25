@@ -94,6 +94,15 @@ def test_current_out_of_distribution_state_fails_closed() -> None:
     )
     assert indicators["execution_gate"]["status"] == "blocked"
     assert indicators["execution_gate"]["model_control_enabled"] is False
+    references = indicators["historical_risk_reference"]
+    assert set(references) == {"5", "10", "20"}
+    for reference in references.values():
+        assert reference["reference_kind"] == "relative_strength_direction_history"
+        assert reference["sample_count"] > 0
+        assert reference["median_return"] is not None
+        assert reference["return_p10"] <= reference["median_return"]
+        assert reference["median_return"] <= reference["return_p90"]
+        assert 0.0 <= reference["loss_probability"] <= 1.0
 
 
 def test_regime_mismatch_is_not_forced_into_forecast() -> None:
@@ -150,6 +159,42 @@ def test_overlapping_paths_use_market_observation_positions() -> None:
     assert 0 < five_day["sample_count"] < 20
     assert "去除5日重叠路径" in five_day["unavailable_reason"]
     assert five_day["median_return"] is None
+
+
+def test_long_reference_history_closes_independent_validation_sample_gap() -> None:
+    dates = pd.bdate_range("2022-01-03", periods=900)
+    x = np.arange(len(dates), dtype=float)
+    predictions = _add_state_features(
+        pd.DataFrame(
+            {
+                "raw_probability": 0.55,
+                "probability": 0.52,
+                "target_weight": 0.5,
+                "model_kind": "shrunk_logistic_regression",
+                "realized_label": np.arange(len(dates)) % 2,
+                "market_trend_120": 0.02,
+                "volatility_20": 0.25,
+                "relative_strength_20": 0.01,
+            },
+            index=dates,
+        )
+    )
+    reference = pd.DataFrame({"close": np.exp(0.0005 * x)}, index=dates)
+    etf = reference.iloc[-320:].copy()
+
+    indicators = build_forecast_indicators(
+        etf,
+        predictions,
+        capital=15_000.0,
+        reference_prices=reference,
+        outcome_source="official_underlying_index",
+    )
+
+    assert indicators["forecast_outcome_source"] == "official_underlying_index"
+    assert all(
+        forecast["validation_sample_count"] >= 20
+        for forecast in indicators["forecast_horizons"].values()
+    )
 
 
 def test_forecast_validation_fails_when_prediction_is_worse_than_zero_baseline() -> None:

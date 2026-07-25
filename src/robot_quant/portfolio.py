@@ -59,10 +59,7 @@ class PortfolioSimulator:
             portfolio_value_at_open = cash + shares * open_price
             target_shares = (
                 math.floor(
-                    portfolio_value_at_open
-                    * target_weight
-                    / open_price
-                    / self.config.lot_size
+                    portfolio_value_at_open * target_weight / open_price / self.config.lot_size
                 )
                 * self.config.lot_size
             )

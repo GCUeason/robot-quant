@@ -6,8 +6,8 @@ from dataclasses import dataclass
 
 import numpy as np
 import pandas as pd
-from sklearn.calibration import CalibratedClassifierCV
 from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import roc_auc_score
 from sklearn.model_selection import TimeSeriesSplit
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
@@ -21,24 +21,32 @@ class PredictionConfig:
     minimum_training_samples: int = 252
     half_position_probability: float = 0.50
     full_position_probability: float = 0.60
-    logistic_c: float = 0.03
+    logistic_c: float = 0.01
+    probability_shrinkage: float = 0.25
     calibration_splits: int = 5
     calibration_gap: int = 10
     ood_lower_quantile: float = 0.01
     ood_upper_quantile: float = 0.99
+    quality_window_size: int = 50
+    maximum_shadow_weight: float = 0.20
 
 
 class WalkForwardPredictor:
     """使用当时已知数据按月重新训练逻辑回归模型。"""
 
     FEATURE_COLUMNS = (
+        "return_5",
+        "return_20",
+        "return_60",
         "distance_ma20",
         "distance_ma60",
         "volatility_20",
+        "volume_ratio_20",
         "relative_strength_20",
         "market_trend_120",
     )
-    MODEL_VERSION = "trend_risk_logistic_v2"
+    MODEL_KIND = "shrunk_logistic_regression"
+    MODEL_VERSION = "trend_risk_logistic_v3"
     MODEL_SELECTION_STATUS = "retrospective_challenger"
 
     def __init__(self, config: PredictionConfig | None = None) -> None:
@@ -57,19 +65,16 @@ class WalkForwardPredictor:
             training_cutoff = monthly_data.index[0]
             train_mask = dataset["label_known_date"].lt(training_cutoff)
             train_data = dataset.loc[train_mask].dropna(subset=[*self.FEATURE_COLUMNS, "label"])
-            raw_model, calibrated_model = self._fit_models(train_data)
+            raw_model = self._fit_model(train_data)
+            training_validation = self._training_validation(train_data)
 
             for date, row in monthly_data.iterrows():
                 features = row.loc[list(self.FEATURE_COLUMNS)]
                 if raw_model is not None and features.notna().all():
                     feature_frame = features.to_frame().T.astype(float)
                     raw_probability = float(raw_model.predict_proba(feature_frame)[0, 1])
-                    if calibrated_model is not None:
-                        probability = float(calibrated_model.predict_proba(feature_frame)[0, 1])
-                        model_kind = "calibrated_logistic_regression"
-                    else:
-                        probability = raw_probability
-                        model_kind = "logistic_regression_uncalibrated"
+                    probability = 0.5 + self.config.probability_shrinkage * (raw_probability - 0.5)
+                    model_kind = self.MODEL_KIND
                 else:
                     probability = self._fallback_probability(row)
                     raw_probability = probability
@@ -78,6 +83,14 @@ class WalkForwardPredictor:
                 research_target_weight = self._target_weight(
                     probability=probability,
                     market_trend=float(row["market_trend_120"]),
+                )
+                distribution_lower, distribution_upper = (
+                    self._distribution_bounds(train_data)
+                    if raw_model is not None and features.notna().all()
+                    else (
+                        pd.Series(np.nan, index=self.FEATURE_COLUMNS, dtype=float),
+                        pd.Series(np.nan, index=self.FEATURE_COLUMNS, dtype=float),
+                    )
                 )
                 ood_features = (
                     self._out_of_distribution_features(features, train_data)
@@ -88,9 +101,7 @@ class WalkForwardPredictor:
                     "out_of_distribution"
                     if ood_features
                     else (
-                        "observation_only"
-                        if model_kind != "trend_fallback"
-                        else "model_unavailable"
+                        "observation_only" if model_kind == self.MODEL_KIND else "model_unavailable"
                     )
                 )
                 record: dict[str, bool | float | str | pd.Timestamp] = {
@@ -105,12 +116,25 @@ class WalkForwardPredictor:
                     "signal_status": signal_status,
                     "is_out_of_distribution": bool(ood_features),
                     "ood_features": ",".join(ood_features),
+                    "ood_training_sample_count": int(len(train_data)),
+                    "probability_shrinkage": (
+                        self.config.probability_shrinkage if model_kind == self.MODEL_KIND else 0.0
+                    ),
+                    "training_oof_sample_count": training_validation["sample_count"],
+                    "training_oof_brier": training_validation["brier"],
+                    "training_oof_auc": training_validation["roc_auc"],
+                    "training_oof_passed": training_validation["passed"],
                     "realized_label": float(row["label"]),
+                    "label_known_date": row["label_known_date"],
                 }
                 record.update({feature: float(row[feature]) for feature in self.FEATURE_COLUMNS})
+                for feature in self.FEATURE_COLUMNS:
+                    record[f"{feature}_ood_lower"] = float(distribution_lower[feature])
+                    record[f"{feature}_ood_upper"] = float(distribution_upper[feature])
                 records.append(record)
 
-        return pd.DataFrame.from_records(records).set_index("date")
+        result = pd.DataFrame.from_records(records).set_index("date")
+        return self._apply_mature_quality_gate(result)
 
     def _out_of_distribution_features(
         self,
@@ -118,9 +142,7 @@ class WalkForwardPredictor:
         training_data: pd.DataFrame,
     ) -> list[str]:
         """仅用本月训练样本的分位边界识别不可安全外推的特征。"""
-        training_features = training_data.loc[:, self.FEATURE_COLUMNS].astype(float)
-        lower = training_features.quantile(self.config.ood_lower_quantile)
-        upper = training_features.quantile(self.config.ood_upper_quantile)
+        lower, upper = self._distribution_bounds(training_data)
         lower_label = _quantile_label(self.config.ood_lower_quantile)
         upper_label = _quantile_label(self.config.ood_upper_quantile)
         breaches: list[str] = []
@@ -132,30 +154,136 @@ class WalkForwardPredictor:
                 breaches.append(f"{column}:above_{upper_label}")
         return breaches
 
-    def _fit_models(
+    def _distribution_bounds(
         self,
         training_data: pd.DataFrame,
-    ) -> tuple[Pipeline | None, CalibratedClassifierCV | None]:
-        raw_model = self._fit_model(training_data)
-        if raw_model is None:
-            return None, None
+    ) -> tuple[pd.Series, pd.Series]:
+        """返回与OOD判断完全一致的训练分位边界，供报告解释。"""
+        training_features = training_data.loc[:, self.FEATURE_COLUMNS].astype(float)
+        return (
+            training_features.quantile(self.config.ood_lower_quantile),
+            training_features.quantile(self.config.ood_upper_quantile),
+        )
 
-        features = training_data.loc[:, self.FEATURE_COLUMNS]
-        labels = training_data["label"].astype(int)
-        calibrated_model = CalibratedClassifierCV(
-            estimator=self._new_model(),
-            method="sigmoid",
-            cv=TimeSeriesSplit(
+    def _training_validation(self, training_data: pd.DataFrame) -> dict:
+        """只用训练集内部的带隔离时序折记录候选稳健性。"""
+        if (
+            len(training_data) < self.config.minimum_training_samples
+            or training_data["label"].nunique() < 2
+        ):
+            return {
+                "sample_count": 0,
+                "brier": None,
+                "roc_auc": None,
+                "passed": False,
+            }
+        records: list[tuple[float, int]] = []
+        try:
+            splitter = TimeSeriesSplit(
                 n_splits=self.config.calibration_splits,
                 gap=self.config.calibration_gap,
-            ),
-            ensemble=True,
-        )
-        try:
-            calibrated_model.fit(features, labels)
+            )
+            for train_positions, validation_positions in splitter.split(training_data):
+                fold_train = training_data.iloc[train_positions]
+                fold_validation = training_data.iloc[validation_positions]
+                model = self._fit_model(fold_train)
+                if model is None:
+                    continue
+                raw = model.predict_proba(fold_validation.loc[:, self.FEATURE_COLUMNS])[:, 1]
+                probability = 0.5 + self.config.probability_shrinkage * (raw - 0.5)
+                records.extend(
+                    (float(score), int(label))
+                    for score, label in zip(
+                        probability,
+                        fold_validation["label"].astype(int),
+                        strict=True,
+                    )
+                )
         except ValueError:
-            return raw_model, None
-        return raw_model, calibrated_model
+            records = []
+        if not records:
+            return {
+                "sample_count": 0,
+                "brier": None,
+                "roc_auc": None,
+                "passed": False,
+            }
+        scores = pd.Series([record[0] for record in records], dtype=float)
+        labels = pd.Series([record[1] for record in records], dtype=int)
+        brier = float(((scores - labels) ** 2).mean())
+        auc = float(roc_auc_score(labels, scores)) if labels.nunique() == 2 else None
+        return {
+            "sample_count": len(records),
+            "brier": brier,
+            "roc_auc": auc,
+            "passed": brier < 0.25 and auc is not None and auc > 0.5,
+        }
+
+    def _apply_mature_quality_gate(self, predictions: pd.DataFrame) -> pd.DataFrame:
+        """逐日仅用已经成熟的预测结果决定不可执行的影子仓位。"""
+        result = predictions.sort_index().copy()
+        gate_records: list[dict[str, bool | float | int | str]] = []
+        for date, current in result.iterrows():
+            matured = result[
+                result["label_known_date"].lt(date)
+                & result["realized_label"].notna()
+                & result["model_kind"].eq(self.MODEL_KIND)
+            ].tail(self.config.quality_window_size)
+            sample_count = len(matured)
+            if sample_count:
+                labels = matured["realized_label"].astype(int)
+                scores = matured["probability"].astype(float)
+                brier = float(((scores - labels) ** 2).mean())
+                auc = (
+                    float(roc_auc_score(labels, scores))
+                    if labels.nunique() == 2 and scores.nunique() > 1
+                    else None
+                )
+            else:
+                brier = None
+                auc = None
+            performance_passed = (
+                sample_count >= self.config.quality_window_size
+                and brier is not None
+                and brier < 0.25
+                and auc is not None
+                and auc > 0.5
+            )
+            quality_gate_passed = (
+                performance_passed
+                and not bool(current["is_out_of_distribution"])
+                and current["model_kind"] == self.MODEL_KIND
+            )
+            if bool(current["is_out_of_distribution"]):
+                reason = f"当前训练分布外：{current['ood_features']}"
+            elif sample_count < self.config.quality_window_size:
+                reason = f"成熟样本不足{self.config.quality_window_size}条（当前{sample_count}条）"
+            elif not performance_passed:
+                reason = "最近成熟窗口未同时通过Brier<0.25与AUC>0.5"
+            elif current["model_kind"] != self.MODEL_KIND:
+                reason = "当前稳健模型不可用"
+            else:
+                reason = "最近成熟窗口通过，仅允许不可执行影子卫星仓"
+            shadow_weight = (
+                min(
+                    float(current["research_target_weight"]),
+                    self.config.maximum_shadow_weight,
+                )
+                if quality_gate_passed
+                else 0.0
+            )
+            gate_records.append(
+                {
+                    "quality_gate_sample_count": sample_count,
+                    "quality_gate_brier": brier,
+                    "quality_gate_auc": auc,
+                    "quality_gate_performance_passed": performance_passed,
+                    "quality_gate_passed": quality_gate_passed,
+                    "quality_gate_reason": reason,
+                    "shadow_target_weight": shadow_weight,
+                }
+            )
+        return result.join(pd.DataFrame(gate_records, index=result.index))
 
     def _build_dataset(
         self,
