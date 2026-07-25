@@ -153,6 +153,7 @@ def _latest_state(
         "etf_close": float(latest["etf_close"]),
         "raw_prediction_probability": float(latest_prediction["raw_probability"]),
         "prediction_probability": float(latest_prediction["probability"]),
+        "approved_probability": 0.5,
         "research_target_weight": float(latest_prediction["research_target_weight"]),
         "next_target_weight": 1.0,
         "executable_target_weight": 1.0,
@@ -162,6 +163,8 @@ def _latest_state(
         "is_out_of_distribution": bool(latest_prediction["is_out_of_distribution"]),
         "ood_features": str(latest_prediction["ood_features"]),
         "model_kind": str(latest_prediction["model_kind"]),
+        "model_version": str(latest_prediction["model_version"]),
+        "model_selection_status": str(latest_prediction["model_selection_status"]),
         "prediction_accuracy": _prediction_accuracy(predictions),
         "initial_contribution": plan.initial_contribution,
         "initial_target_weight": plan.initial_target_weight,
@@ -176,6 +179,7 @@ def _latest_state(
         "baseline_roi": baseline_value / contributions - 1.0,
         "baseline_max_drawdown": _max_drawdown(history["baseline_nav"]),
         "strategy_value_difference": strategy_value - baseline_value,
+        "strategy_validation": _strategy_validation(strategy_value, baseline_value),
     }
 
 
@@ -192,6 +196,7 @@ def _pending_state(
         "etf_close": float(etf.iloc[-1]["close"]),
         "raw_prediction_probability": float(latest_prediction["raw_probability"]),
         "prediction_probability": float(latest_prediction["probability"]),
+        "approved_probability": 0.5,
         "research_target_weight": float(latest_prediction["research_target_weight"]),
         "next_target_weight": 1.0,
         "executable_target_weight": 1.0,
@@ -201,6 +206,8 @@ def _pending_state(
         "is_out_of_distribution": bool(latest_prediction["is_out_of_distribution"]),
         "ood_features": str(latest_prediction["ood_features"]),
         "model_kind": str(latest_prediction["model_kind"]),
+        "model_version": str(latest_prediction["model_version"]),
+        "model_selection_status": str(latest_prediction["model_selection_status"]),
         "prediction_accuracy": _prediction_accuracy(predictions),
         "initial_contribution": plan.initial_contribution,
         "initial_target_weight": plan.initial_target_weight,
@@ -215,6 +222,7 @@ def _pending_state(
         "baseline_roi": None,
         "baseline_max_drawdown": None,
         "strategy_value_difference": 0.0,
+        "strategy_validation": _strategy_validation(0.0, 0.0),
     }
 
 
@@ -224,6 +232,15 @@ def _prediction_accuracy(predictions: pd.DataFrame) -> float | None:
         return None
     predicted_label = (realized["probability"] >= 0.5).astype(float)
     return float((predicted_label == realized["realized_label"]).mean())
+
+
+def _strategy_validation(strategy_value: float, baseline_value: float) -> dict:
+    return {
+        "status": "baseline_only",
+        "model_excess_value": strategy_value - baseline_value,
+        "passes_fixed_dca": False,
+        "reason": "模型未通过质量门控，当前不具备可验证的交易Alpha",
+    }
 
 
 def _empty_history() -> pd.DataFrame:

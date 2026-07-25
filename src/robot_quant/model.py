@@ -21,7 +21,7 @@ class PredictionConfig:
     minimum_training_samples: int = 252
     half_position_probability: float = 0.50
     full_position_probability: float = 0.60
-    logistic_c: float = 0.10
+    logistic_c: float = 0.03
     calibration_splits: int = 5
     calibration_gap: int = 10
     ood_lower_quantile: float = 0.01
@@ -32,16 +32,14 @@ class WalkForwardPredictor:
     """使用当时已知数据按月重新训练逻辑回归模型。"""
 
     FEATURE_COLUMNS = (
-        "return_5",
-        "return_20",
-        "return_60",
         "distance_ma20",
         "distance_ma60",
         "volatility_20",
-        "volume_ratio_20",
         "relative_strength_20",
         "market_trend_120",
     )
+    MODEL_VERSION = "trend_risk_logistic_v2"
+    MODEL_SELECTION_STATUS = "retrospective_challenger"
 
     def __init__(self, config: PredictionConfig | None = None) -> None:
         self.config = config or PredictionConfig()
@@ -102,6 +100,8 @@ class WalkForwardPredictor:
                     "target_weight": research_target_weight,
                     "research_target_weight": research_target_weight,
                     "model_kind": model_kind,
+                    "model_version": self.MODEL_VERSION,
+                    "model_selection_status": self.MODEL_SELECTION_STATUS,
                     "signal_status": signal_status,
                     "is_out_of_distribution": bool(ood_features),
                     "ood_features": ",".join(ood_features),
