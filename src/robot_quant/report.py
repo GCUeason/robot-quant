@@ -74,6 +74,7 @@ def _markdown(state: dict) -> str:
     if state["simulation_status"] == "pending":
         return _pending_markdown(state)
 
+    model_selection = _model_selection_label(state["model_selection_status"])
     target_percent = state["executable_target_weight"] * 100
     research_target_percent = state["research_target_weight"] * 100
     initial_target_percent = state["initial_target_weight"] * 100
@@ -97,6 +98,12 @@ def _markdown(state: dict) -> str:
 - 可执行目标仓位：**{target_percent:.0f}%**
 - 执行政策：**固定定投是唯一可执行模拟**；模型尚未获得仓位控制权。
 - 门控原因：{_gate_reasons(state)}
+
+## 基线优先门控
+
+- 候选模型：**{model_selection}** `{state["model_version"]}`；它是在查看既有历史后提出的候选，只能用未来新增数据继续验证。
+- 模型研究概率：**{state["prediction_probability"]:.2%}**；批准概率固定为**{state["approved_probability"]:.2%}**，表示当前没有可执行优势。
+- 策略结论：**{state["strategy_validation"]["reason"]}**。
 
 {_indicator_markdown(state)}
 
@@ -123,6 +130,7 @@ def _markdown(state: dict) -> str:
 
 
 def _pending_markdown(state: dict) -> str:
+    model_selection = _model_selection_label(state["model_selection_status"])
     model_target_percent = state["research_target_weight"] * 100
     initial_target_percent = state["initial_target_weight"] * 100
     return f"""# 机器人ETF模拟账户日报
@@ -153,6 +161,12 @@ def _pending_markdown(state: dict) -> str:
 
 - 固定定投是唯一可执行模拟；模型不调整仓位。
 - 门控原因：{_gate_reasons(state)}
+
+## 基线优先门控
+
+- 候选模型：**{model_selection}** `{state["model_version"]}`；只能用未来新增数据继续验证。
+- 模型研究概率：**{state["prediction_probability"]:.2%}**；批准概率固定为**{state["approved_probability"]:.2%}**。
+- 策略结论：**{state["strategy_validation"]["reason"]}**。
 
 首次买入按既定计划执行；后续仍按固定定投计划运行。
 
@@ -198,13 +212,15 @@ def _indicator_markdown(state: dict) -> str:
             f"{_percent(forecast['validation_mae'])} | "
             f"{_percent(forecast['validation_zero_baseline_mae'])} | "
             f"{_percent(forecast['validation_direction_accuracy'])} | "
-            f"{_percent(forecast['validation_interval_coverage'])} |"
+            f"{_percent(forecast['validation_interval_coverage'])} | "
+            f"{_forecast_validation_label(forecast['validation_status'])} |"
         )
         for horizon, forecast in forecasts.items()
     )
     status_labels = {
         "insufficient_samples": "样本不足",
-        "observation_only": "仅观察",
+        "baseline_failed": "未击败随机基线",
+        "unstable": "分段表现不稳定",
         "provisional": "初步可用",
         "validated": "已通过当前验证门槛",
     }
@@ -218,12 +234,16 @@ def _indicator_markdown(state: dict) -> str:
             f"{evidence['actual_mean_return_10']:.2%} | "
             f"{evidence['actual_loss_probability_10']:.2%} | "
             f"{evidence['actual_mean_worst_return_10']:.2%} | "
-            f"{evidence['mean_return_difference_vs_all']:+.2%} |"
+            f"{evidence['mean_return_difference_vs_all']:+.2%} | "
+            f"{'是' if evidence['passes_minimum_samples'] else '否'} | "
+            f"{'是' if evidence['directionally_consistent'] else '否'} |"
         )
         for historical_action, evidence in sell_validation["actions"].items()
     )
     if not sell_validation_rows:
-        sell_validation_rows = "| 暂无足够样本 | 0 | 不可用 | 不可用 | 不可用 | 不可用 | 不可用 |"
+        sell_validation_rows = (
+            "| 暂无足够样本 | 0 | 不可用 | 不可用 | 不可用 | 不可用 | 不可用 | 否 | 否 |"
+        )
     baseline = sell_validation.get("all_dates_baseline")
     baseline_summary = (
         "暂无足够样本。"
@@ -239,6 +259,33 @@ def _indicator_markdown(state: dict) -> str:
         f"{_percent(validation['accuracy_wilson95_low'])} ～ "
         f"{_percent(validation['accuracy_wilson95_high'])}"
     )
+    sell_status_labels = {
+        "insufficient_samples": "独立样本不足",
+        "insufficient_action_samples": "极端动作样本不足",
+        "inverse_signal": "方向倒挂",
+        "validated": "已通过",
+    }
+    sell_status = sell_status_labels.get(
+        sell_validation["status"],
+        sell_validation["status"],
+    )
+    sell_reasons = "；".join(sell_validation["reasons"]) or "已通过当前门槛"
+    stability_kind_labels = {
+        "fixed_block": "固定分段",
+        "rolling_tail": "最新尾窗",
+    }
+    stability_rows = "\n".join(
+        (
+            f"| {stability_kind_labels.get(window['window_kind'], window['window_kind'])} | "
+            f"{window['start_date']} | {window['end_date']} | "
+            f"{window['sample_count']} | {window['brier']:.4f} | "
+            f"{_decimal(window['roc_auc'])} | "
+            f"{'通过' if window['passes'] else '失败'} |"
+        )
+        for window in validation["stability_windows"]
+    )
+    if not stability_rows:
+        stability_rows = "| 暂无 | 暂无 | 暂无 | 0 | 不可用 | 不可用 | 失败 |"
     return f"""## 研究型预估收益与下跌风险
 
 以下区间只使用市场趋势、相对强弱和完整特征距离均合格的历史状态，并按持有期去除重叠路径，最多取40个有效样本。有效样本少于20条时全部收益数字停用，不强行预测。
@@ -261,15 +308,19 @@ def _indicator_markdown(state: dict) -> str:
 
 ### 卖出规则历史验证
 
-规则在**{sell_validation["sample_count"]}**个滚动样本外日期上可计算；每次只使用该日以前已经实现的相似结果。
+验证状态：**{sell_status}**。规则在**{sell_validation["sample_count"]}**个近似独立样本外日期上可计算；每次只使用该日以前已经实现的相似结果，相邻记录至少间隔10个交易日。
+
+- 最低总样本：{sell_validation["minimum_sample_count"]}；每种保持/观察/减仓/退出动作最低样本：{sell_validation["minimum_action_sample_count"]}。
+- 方向一致性：**{"通过" if sell_validation["directionally_consistent"] else "未通过"}**；原因：{sell_reasons}。
+- 方向倒挂检查：保持应优于总体，观察/减仓/退出应弱于总体；不满足时不反向交易，直接停用规则。
 
 {baseline_summary}
 
-| 当时动作 | 触发次数 | 随后10日实际中位收益 | 随后10日实际平均收益 | 随后10日实际亏损率 | 路径平均最差收益 | 平均收益较全部日期 |
-|---|---:|---:|---:|---:|---:|---:|
+| 当时动作 | 独立触发次数 | 随后10日实际中位收益 | 随后10日实际平均收益 | 随后10日实际亏损率 | 路径平均最差收益 | 平均收益较全部日期 | 样本达标 | 方向一致 |
+|---|---:|---:|---:|---:|---:|---:|---|---|
 {sell_validation_rows}
 
-这些阈值是预先设定的工程风险线，没有用本批数据调参。“较全部日期”只是状态分组差，不是执行规则带来的因果收益。10日窗口彼此重叠，触发次数也不等于独立交易次数；若减仓或退出样本很少，该动作仍没有足够证据。
+这些阈值是预先设定的工程风险线，没有用本批数据调参。“较全部日期”只是状态分组差，不是执行规则带来的因果收益；卖出规则只有在独立样本量和方向一致性同时通过后才可能启用。
 
 ## 样本外验证
 
@@ -279,10 +330,23 @@ def _indicator_markdown(state: dict) -> str:
 - 全部重叠日标签的描述性方向准确率：**{_percent(validation["direction_accuracy"])}**。
 - 每隔10个交易日抽取一次的近似非重叠样本：**{validation["confidence_sample_count"]}**；方向准确率：**{_percent(validation["confidence_direction_accuracy"])}**；Wilson 95%区间：**{model_accuracy_interval}**。
 - 校准后Brier分数：**{_decimal(validation["calibrated_brier"])}**；原始模型：**{_decimal(validation["raw_brier"])}**；固定50%概率基线：**{validation["constant_50_brier"]:.4f}**。Brier越低越好。
+- Brier技能分数：**{_percent(validation["brier_skill_score"])}**（高于0才表示击败50%基线）；分段稳定性通过：**{"是" if validation["passes_stability"] else "否"}**。
 - ROC AUC：**{_decimal(validation["roc_auc"])}**；0.5约等于随机排序。
 
-| 预测期 | 验证样本 | 中位预测MAE | 零收益基线MAE | 方向准确率 | 10%～90%区间覆盖率 |
-|---|---:|---:|---:|---:|---:|
+### 模型分段稳定性
+
+每50个连续已实现预测形成一个固定分段，至少需要3个固定分段。最新尾段不足40条时，额外检查最近50条滚动尾窗，但该重叠尾窗不计入独立分段数量。所有列出的窗口都必须同时满足Brier低于0.25且AUC高于0.5。
+
+| 窗口类型 | 开始日期 | 结束日期 | 样本数 | Brier | ROC AUC | 结果 |
+|---|---|---|---:|---:|---:|---|
+{stability_rows}
+
+### 零收益基线门控
+
+只有在近似独立样本不少于20条、预测MAE低于零收益基线MAE、且方向准确率高于50%时，才展示收益、价格与盈亏预估；否则全部停用。
+
+| 预测期 | 独立验证样本 | 中位预测MAE | 零收益基线MAE | 方向准确率 | 10%～90%区间覆盖率 | 门控状态 |
+|---|---:|---:|---:|---:|---:|---|
 {validation_rows}
 
 相似样本验证严格只使用每个预测日当时已经实现的历史结果。若中位预测MAE没有低于零收益基线，或模型Brier没有低于0.25，本指标只作为风险观察，不能作为独立买卖依据。"""
@@ -345,6 +409,21 @@ def _evidence_label(status: str) -> str:
         "sufficient": "可描述",
         "insufficient": "样本不足",
         "unavailable": "暂无足够样本",
+        "unvalidated": "未通过历史验证",
+    }.get(status, status)
+
+
+def _forecast_validation_label(status: str) -> str:
+    return {
+        "insufficient_samples": "独立样本不足",
+        "baseline_failed": "未击败零收益基线",
+        "validated": "已通过",
+    }.get(status, status)
+
+
+def _model_selection_label(status: str) -> str:
+    return {
+        "retrospective_challenger": "回顾性挑战者",
     }.get(status, status)
 
 

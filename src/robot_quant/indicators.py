@@ -18,6 +18,12 @@ CALIBRATED_MODEL = "calibrated_logistic_regression"
 RELATIVE_STRENGTH_TOLERANCE = 0.03
 MAX_SIMILARITY_DISTANCE = 3.0
 ANALOG_FEATURES = WalkForwardPredictor.FEATURE_COLUMNS
+STABILITY_WINDOW_SIZE = 50
+MIN_STABILITY_WINDOW_SAMPLES = 40
+MIN_STABILITY_WINDOWS = 3
+MIN_FORECAST_VALIDATION_SAMPLES = 20
+MIN_SELL_RULE_SAMPLES = 20
+MIN_SELL_ACTION_SAMPLES = 10
 
 
 @dataclass(frozen=True)
@@ -73,9 +79,14 @@ def build_forecast_indicators(
             validation=_validate_analogs(frame, horizon),
         )
 
-    model_validation = _model_validation(frame)
-    sell_indicators = _sell_indicators(frame, forecasts, model_validation)
     sell_rule_validation = _validate_sell_rule(frame)
+    model_validation = _model_validation(frame)
+    sell_indicators = _sell_indicators(
+        frame,
+        forecasts,
+        model_validation,
+        sell_rule_validation,
+    )
     return {
         "forecast_horizons": forecasts,
         "sell_indicators": sell_indicators,
@@ -241,38 +252,24 @@ def _summarize_horizon(
     returns = analogs[f"future_return_{horizon}"].dropna().astype(float)
     downside = analogs[f"worst_return_{horizon}"].dropna().astype(float)
     if len(returns) < MIN_ANALOG_COUNT:
-        return {
-            "sample_count": int(len(returns)),
-            "effective_sample_count": int(len(returns)),
-            "evidence_status": "unavailable" if returns.empty else "insufficient",
-            "unavailable_reason": selection.get(
+        return _unavailable_forecast(
+            returns=returns,
+            selection=selection,
+            evidence_status="unavailable" if returns.empty else "insufficient",
+            unavailable_reason=selection.get(
                 "unavailable_reason",
                 f"有效非重叠样本不足20条（当前{len(returns)}条）",
             ),
-            "candidate_count": int(selection.get("candidate_count", 0)),
-            "regime_match_count": int(selection.get("regime_match_count", 0)),
-            "relative_strength_match_count": int(selection.get("relative_strength_match_count", 0)),
-            "distance_match_count": int(selection.get("distance_match_count", 0)),
-            "maximum_similarity_distance": selection.get("maximum_similarity_distance"),
-            "mean_return": None,
-            "median_return": None,
-            "return_p10": None,
-            "return_p90": None,
-            "loss_probability": None,
-            "drawdown_event_probability": None,
-            "drawdown_5pct_probability": None,
-            "drawdown_event_sample_count": 0,
-            "drawdown_trough_day_median": None,
-            "drawdown_trough_day_p25": None,
-            "drawdown_trough_day_p75": None,
-            "drawdown_5pct_sample_count": 0,
-            "drawdown_5pct_trough_day_median": None,
-            "expected_price": None,
-            "downside_price_p10": None,
-            "upside_price_p90": None,
-            "expected_profit_on_capital": None,
-            **validation,
-        }
+            validation=validation,
+        )
+    if validation["validation_status"] != "validated":
+        return _unavailable_forecast(
+            returns=returns,
+            selection=selection,
+            evidence_status="unvalidated",
+            unavailable_reason=validation["validation_reason"],
+            validation=validation,
+        )
 
     median_return = float(returns.median())
     return_p10 = float(returns.quantile(0.10))
@@ -319,12 +316,56 @@ def _summarize_horizon(
     }
 
 
+def _unavailable_forecast(
+    *,
+    returns: pd.Series,
+    selection: dict,
+    evidence_status: str,
+    unavailable_reason: str,
+    validation: dict,
+) -> dict:
+    return {
+        "sample_count": int(len(returns)),
+        "effective_sample_count": int(len(returns)),
+        "evidence_status": evidence_status,
+        "unavailable_reason": unavailable_reason,
+        "candidate_count": int(selection.get("candidate_count", 0)),
+        "regime_match_count": int(selection.get("regime_match_count", 0)),
+        "relative_strength_match_count": int(selection.get("relative_strength_match_count", 0)),
+        "distance_match_count": int(selection.get("distance_match_count", 0)),
+        "maximum_similarity_distance": selection.get("maximum_similarity_distance"),
+        "mean_return": None,
+        "median_return": None,
+        "return_p10": None,
+        "return_p90": None,
+        "loss_probability": None,
+        "drawdown_event_probability": None,
+        "drawdown_5pct_probability": None,
+        "drawdown_event_sample_count": 0,
+        "drawdown_trough_day_median": None,
+        "drawdown_trough_day_p25": None,
+        "drawdown_trough_day_p75": None,
+        "drawdown_5pct_sample_count": 0,
+        "drawdown_5pct_trough_day_median": None,
+        "expected_price": None,
+        "downside_price_p10": None,
+        "upside_price_p90": None,
+        "expected_profit_on_capital": None,
+        **validation,
+    }
+
+
 def _validate_analogs(frame: pd.DataFrame, horizon: int) -> dict:
     actual_column = f"future_return_{horizon}"
     known_column = f"known_date_{horizon}"
     tests = frame[frame["model_kind"].eq(CALIBRATED_MODEL) & frame[actual_column].notna()]
     records: list[tuple[float, float, float, float]] = []
+    timeline_positions = {pd.Timestamp(date): position for position, date in enumerate(frame.index)}
+    last_record_position: int | None = None
     for date, row in tests.iterrows():
+        position = timeline_positions[pd.Timestamp(date)]
+        if last_record_position is not None and position - last_record_position < horizon:
+            continue
         pool = frame[frame["model_kind"].eq(CALIBRATED_MODEL) & frame[known_column].lt(date)]
         analogs = _select_analogs(pool, row, horizon, frame.index)
         values = analogs[actual_column].dropna().astype(float)
@@ -338,35 +379,65 @@ def _validate_analogs(frame: pd.DataFrame, horizon: int) -> dict:
                 float(values.quantile(0.90)),
             )
         )
+        last_record_position = position
 
-    if not records:
+    return assess_forecast_validation(
+        pd.DataFrame(
+            records,
+            columns=["actual", "forecast", "lower", "upper"],
+        )
+    )
+
+
+def assess_forecast_validation(records: pd.DataFrame) -> dict:
+    """判断收益预测是否在独立样本上真正优于零收益基线。"""
+    if records.empty:
         return {
             "validation_sample_count": 0,
             "validation_mae": None,
             "validation_zero_baseline_mae": None,
             "validation_direction_accuracy": None,
             "validation_interval_coverage": None,
+            "validation_status": "insufficient_samples",
+            "validation_beats_zero_baseline": None,
+            "validation_passes_direction": None,
+            "validation_reason": (
+                f"独立验证样本不足{MIN_FORECAST_VALIDATION_SAMPLES}条（当前0条）"
+            ),
         }
 
-    validation = pd.DataFrame(
-        records,
-        columns=["actual", "forecast", "lower", "upper"],
-    )
+    actual = records["actual"].astype(float)
+    forecast = records["forecast"].astype(float)
+    mae = float((actual - forecast).abs().mean())
+    zero_baseline_mae = float(actual.abs().mean())
+    direction_accuracy = float(((actual >= 0.0) == (forecast >= 0.0)).mean())
+    beats_zero_baseline = mae < zero_baseline_mae
+    passes_direction = direction_accuracy > 0.50
+    sample_count = int(len(records))
+    if sample_count < MIN_FORECAST_VALIDATION_SAMPLES:
+        status = "insufficient_samples"
+        reason = f"独立验证样本不足{MIN_FORECAST_VALIDATION_SAMPLES}条（当前{sample_count}条）"
+    elif not beats_zero_baseline or not passes_direction:
+        status = "baseline_failed"
+        reason = "预测未同时击败零收益MAE基线并达到高于50%的方向准确率，收益预测已停用"
+    else:
+        status = "validated"
+        reason = "独立样本MAE与方向准确率均通过基线门槛"
     return {
-        "validation_sample_count": int(len(validation)),
-        "validation_mae": float((validation["actual"] - validation["forecast"]).abs().mean()),
-        "validation_zero_baseline_mae": float(validation["actual"].abs().mean()),
-        "validation_direction_accuracy": float(
-            ((validation["actual"] >= 0.0) == (validation["forecast"] >= 0.0)).mean()
-        ),
+        "validation_sample_count": sample_count,
+        "validation_mae": mae,
+        "validation_zero_baseline_mae": zero_baseline_mae,
+        "validation_direction_accuracy": direction_accuracy,
         "validation_interval_coverage": float(
-            validation["actual"]
-            .between(
-                validation["lower"],
-                validation["upper"],
-            )
-            .mean()
+            actual.between(
+                records["lower"].astype(float),
+                records["upper"].astype(float),
+            ).mean()
         ),
+        "validation_status": status,
+        "validation_beats_zero_baseline": beats_zero_baseline,
+        "validation_passes_direction": passes_direction,
+        "validation_reason": reason,
     }
 
 
@@ -392,10 +463,26 @@ def _model_validation(frame: pd.DataFrame) -> dict:
     else:
         auc = None
 
+    constant_brier = 0.25
+    brier_skill_score = (
+        1.0 - calibrated_brier / constant_brier if calibrated_brier is not None else None
+    )
+    passes_brier_baseline = calibrated_brier is not None and calibrated_brier < constant_brier
+    passes_auc_baseline = auc is not None and auc > 0.50
+    stability_windows = _stability_windows(realized)
+    fixed_stability_windows = [
+        window for window in stability_windows if window["window_kind"] == "fixed_block"
+    ]
+    passes_stability = len(fixed_stability_windows) >= MIN_STABILITY_WINDOWS and all(
+        window["passes"] for window in stability_windows
+    )
+
     if count < 100:
         status = "insufficient_samples"
-    elif calibrated_brier is not None and calibrated_brier >= 0.25:
-        status = "observation_only"
+    elif not passes_brier_baseline or not passes_auc_baseline:
+        status = "baseline_failed"
+    elif not passes_stability:
+        status = "unstable"
     elif interval[0] is None or interval[0] <= 0.50 or confidence_count < 25:
         status = "provisional"
     else:
@@ -411,10 +498,53 @@ def _model_validation(frame: pd.DataFrame) -> dict:
         "accuracy_wilson95_high": interval[1],
         "calibrated_brier": calibrated_brier,
         "raw_brier": raw_brier,
-        "constant_50_brier": 0.25,
+        "constant_50_brier": constant_brier,
+        "brier_skill_score": brier_skill_score,
+        "passes_brier_baseline": passes_brier_baseline,
+        "passes_auc_baseline": passes_auc_baseline,
+        "stability_windows": stability_windows,
+        "passes_stability": passes_stability,
         "roc_auc": auc,
         "status": status,
         "calibration_method": "sigmoid_timeseries_gap10",
+    }
+
+
+def _stability_windows(realized: pd.DataFrame) -> list[dict]:
+    windows: list[dict] = []
+    for start in range(0, len(realized), STABILITY_WINDOW_SIZE):
+        window = realized.iloc[start : start + STABILITY_WINDOW_SIZE]
+        if len(window) < MIN_STABILITY_WINDOW_SAMPLES:
+            continue
+        windows.append(_stability_window_summary(window, "fixed_block"))
+    remainder = len(realized) % STABILITY_WINDOW_SIZE
+    if 0 < remainder < MIN_STABILITY_WINDOW_SAMPLES and len(realized) >= STABILITY_WINDOW_SIZE:
+        windows.append(
+            _stability_window_summary(
+                realized.iloc[-STABILITY_WINDOW_SIZE:],
+                "rolling_tail",
+            )
+        )
+    return windows
+
+
+def _stability_window_summary(window: pd.DataFrame, window_kind: str) -> dict:
+    labels = window["realized_label"].astype(int)
+    probability = window["probability"].astype(float)
+    brier = float(((probability - labels) ** 2).mean())
+    auc = float(roc_auc_score(labels, probability)) if labels.nunique() == 2 else None
+    passes_brier = brier < 0.25
+    passes_auc = auc is not None and auc > 0.50
+    return {
+        "window_kind": window_kind,
+        "start_date": pd.Timestamp(window.index[0]).strftime("%Y-%m-%d"),
+        "end_date": pd.Timestamp(window.index[-1]).strftime("%Y-%m-%d"),
+        "sample_count": int(len(window)),
+        "brier": brier,
+        "roc_auc": auc,
+        "passes_brier_baseline": passes_brier,
+        "passes_auc_baseline": passes_auc,
+        "passes": passes_brier and passes_auc,
     }
 
 
@@ -422,6 +552,7 @@ def _sell_indicators(
     frame: pd.DataFrame,
     forecasts: dict[str, dict],
     model_validation: dict,
+    sell_rule_validation: dict,
 ) -> dict:
     current = frame.iloc[-1]
     ten_day = forecasts["10"]
@@ -436,6 +567,8 @@ def _sell_indicators(
         unavailable_reason = "当前没有可用的校准模型"
     elif ten_day["evidence_status"] != "sufficient":
         unavailable_reason = ten_day["unavailable_reason"]
+    elif sell_rule_validation["status"] != "validated":
+        unavailable_reason = f"卖出规则验证状态为{sell_rule_validation['status']}，当前动作不可执行"
     else:
         unavailable_reason = ""
     if unavailable_reason:
@@ -487,7 +620,12 @@ def _validate_sell_rule(frame: pd.DataFrame) -> dict:
     known_column = f"known_date_{horizon}"
     tests = frame[frame["model_kind"].eq(CALIBRATED_MODEL) & frame[actual_column].notna()]
     records: list[dict[str, float | str]] = []
+    timeline_positions = {pd.Timestamp(date): position for position, date in enumerate(frame.index)}
+    last_record_position: int | None = None
     for date, row in tests.iterrows():
+        position = timeline_positions[pd.Timestamp(date)]
+        if last_record_position is not None and position - last_record_position < horizon:
+            continue
         pool = frame[frame["model_kind"].eq(CALIBRATED_MODEL) & frame[known_column].lt(date)]
         analogs = _select_analogs(pool, row, horizon, frame.index)
         returns = analogs[actual_column].dropna().astype(float)
@@ -507,15 +645,30 @@ def _validate_sell_rule(frame: pd.DataFrame) -> dict:
                 "actual_worst_return_10": float(row["worst_return_10"]),
             }
         )
+        last_record_position = position
 
-    if not records:
-        return {"sample_count": 0, "actions": {}}
+    return assess_sell_rule_outcomes(pd.DataFrame.from_records(records))
 
-    results = pd.DataFrame.from_records(records)
-    overall_returns = results["actual_return_10"].astype(float)
-    overall_worst_returns = results["actual_worst_return_10"].astype(float)
+
+def assess_sell_rule_outcomes(records: pd.DataFrame) -> dict:
+    """用独立结果检查卖出动作是否方向一致且具备最低样本量。"""
+    if records.empty:
+        return {
+            "status": "insufficient_samples",
+            "sample_count": 0,
+            "minimum_sample_count": MIN_SELL_RULE_SAMPLES,
+            "minimum_action_sample_count": MIN_SELL_ACTION_SAMPLES,
+            "directionally_consistent": False,
+            "actions": {},
+            "all_dates_baseline": None,
+            "reasons": [f"独立验证样本不足{MIN_SELL_RULE_SAMPLES}条（当前0条）"],
+            "method": "walk_forward_non_overlapping_known_outcomes_only",
+        }
+
+    overall_returns = records["actual_return_10"].astype(float)
+    overall_worst_returns = records["actual_worst_return_10"].astype(float)
     overall = {
-        "sample_count": int(len(results)),
+        "sample_count": int(len(records)),
         "actual_mean_return_10": float(overall_returns.mean()),
         "actual_median_return_10": float(overall_returns.median()),
         "actual_loss_probability_10": float((overall_returns < 0.0).mean()),
@@ -523,26 +676,91 @@ def _validate_sell_rule(frame: pd.DataFrame) -> dict:
     }
     actions: dict[str, dict] = {}
     for action in ("hold", "watch", "reduce", "exit"):
-        outcomes = results.loc[results["action"].eq(action), "actual_return_10"].astype(float)
-        worst_outcomes = results.loc[
-            results["action"].eq(action),
+        outcomes = records.loc[records["action"].eq(action), "actual_return_10"].astype(float)
+        worst_outcomes = records.loc[
+            records["action"].eq(action),
             "actual_worst_return_10",
         ].astype(float)
         if outcomes.empty:
             continue
+        mean_difference = float(outcomes.mean() - overall_returns.mean())
+        loss_probability = float((outcomes < 0.0).mean())
+        if action == "hold":
+            directionally_consistent = (
+                mean_difference > 0.0 and loss_probability < overall["actual_loss_probability_10"]
+            )
+        else:
+            directionally_consistent = (
+                mean_difference < 0.0 and loss_probability > overall["actual_loss_probability_10"]
+            )
         actions[action] = {
             "sample_count": int(len(outcomes)),
             "actual_mean_return_10": float(outcomes.mean()),
             "actual_median_return_10": float(outcomes.median()),
-            "actual_loss_probability_10": float((outcomes < 0.0).mean()),
+            "actual_loss_probability_10": loss_probability,
             "actual_mean_worst_return_10": float(worst_outcomes.mean()),
-            "mean_return_difference_vs_all": float(outcomes.mean() - overall_returns.mean()),
+            "mean_return_difference_vs_all": mean_difference,
+            "passes_minimum_samples": len(outcomes) >= MIN_SELL_ACTION_SAMPLES,
+            "directionally_consistent": directionally_consistent,
         }
+
+    reasons: list[str] = []
+    sample_count = int(len(records))
+    if sample_count < MIN_SELL_RULE_SAMPLES:
+        reasons.append(f"独立验证样本不足{MIN_SELL_RULE_SAMPLES}条（当前{sample_count}条）")
+    required_actions = ("hold", "watch", "reduce", "exit")
+    action_sample_counts = {
+        action: int(actions.get(action, {}).get("sample_count", 0)) for action in required_actions
+    }
+    for action, action_sample_count in action_sample_counts.items():
+        if action_sample_count < MIN_SELL_ACTION_SAMPLES:
+            action_label = {
+                "hold": "保持",
+                "watch": "观察",
+                "reduce": "减仓",
+                "exit": "退出",
+            }[action]
+            reasons.append(
+                f"{action_label}动作独立样本仅{action_sample_count}次，"
+                f"低于最低{MIN_SELL_ACTION_SAMPLES}次"
+            )
+    inconsistent_actions = [
+        action for action, evidence in actions.items() if not evidence["directionally_consistent"]
+    ]
+    if inconsistent_actions:
+        labels = {
+            "hold": "保持",
+            "watch": "观察",
+            "reduce": "减仓",
+            "exit": "退出",
+        }
+        reasons.append(
+            "动作与后续行情方向倒挂："
+            + "、".join(labels[action] for action in inconsistent_actions)
+        )
+
+    has_low_action_samples = any(
+        count < MIN_SELL_ACTION_SAMPLES for count in action_sample_counts.values()
+    )
+    directionally_consistent = not inconsistent_actions
+    if sample_count < MIN_SELL_RULE_SAMPLES:
+        status = "insufficient_samples"
+    elif has_low_action_samples:
+        status = "insufficient_action_samples"
+    elif not directionally_consistent:
+        status = "inverse_signal"
+    else:
+        status = "validated"
     return {
-        "sample_count": int(len(results)),
+        "status": status,
+        "sample_count": sample_count,
+        "minimum_sample_count": MIN_SELL_RULE_SAMPLES,
+        "minimum_action_sample_count": MIN_SELL_ACTION_SAMPLES,
+        "directionally_consistent": directionally_consistent,
         "actions": actions,
         "all_dates_baseline": overall,
-        "method": "walk_forward_known_outcomes_only",
+        "reasons": reasons,
+        "method": "walk_forward_non_overlapping_known_outcomes_only",
     }
 
 

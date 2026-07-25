@@ -61,10 +61,25 @@ def test_run_daily_is_idempotent_and_writes_observable_results(tmp_path) -> None
     assert state["execution_policy"] == "fixed_dca_only"
     assert state["model_control_enabled"] is False
     assert state["executable_target_weight"] == 1.0
+    assert state["approved_probability"] == 0.5
     assert state["strategy_value"] == state["baseline_value"]
+    assert state["strategy_validation"] == {
+        "status": "baseline_only",
+        "model_excess_value": 0.0,
+        "passes_fixed_dca": False,
+        "reason": "模型未通过质量门控，当前不具备可验证的交易Alpha",
+    }
     assert set(state["forecast_horizons"]) == {"5", "10", "20"}
     for forecast in state["forecast_horizons"].values():
         assert forecast["sample_count"] <= 40
+        assert forecast["validation_status"] in {
+            "insufficient_samples",
+            "baseline_failed",
+            "validated",
+        }
+        assert "validation_beats_zero_baseline" in forecast
+        if forecast["validation_status"] != "validated":
+            assert forecast["median_return"] is None
         if forecast["evidence_status"] == "sufficient":
             assert forecast["return_p10"] <= forecast["median_return"]
             assert forecast["median_return"] <= forecast["return_p90"]
@@ -82,16 +97,34 @@ def test_run_daily_is_idempotent_and_writes_observable_results(tmp_path) -> None
         assert evidence["sample_count"] > 0
         assert 0.0 <= evidence["actual_loss_probability_10"] <= 1.0
     assert state["model_validation"]["calibrated_sample_count"] > 0
+    assert "brier_skill_score" in state["model_validation"]
+    assert "passes_brier_baseline" in state["model_validation"]
+    assert "stability_windows" in state["model_validation"]
     assert (
         state["model_validation"]["confidence_sample_count"]
         <= state["model_validation"]["calibrated_sample_count"]
     )
+    assert state["sell_rule_validation"]["status"] in {
+        "insufficient_samples",
+        "insufficient_action_samples",
+        "inverse_signal",
+        "validated",
+    }
+    assert state["sell_rule_validation"]["minimum_action_sample_count"] == 10
+    assert "directionally_consistent" in state["sell_rule_validation"]
     report = (output_dir / "reports" / "latest.md").read_text()
     assert "未来10个交易日跑赢沪深300的预测概率" in report
     assert "未来10日相对沪深300研究信号" in report
     assert "下一交易日执行计划" in report
     assert "下一交易日预测" not in report
     assert "固定定投是唯一可执行模拟" in report
+    assert "基线优先门控" in report
+    assert "回顾性挑战者" in report
+    assert "当前不具备可验证的交易Alpha" in report
+    assert "零收益基线门控" in report
+    assert "模型分段稳定性" in report
+    assert "独立样本" in report
+    assert "方向倒挂" in report
     assert "预估收益与下跌风险" in report
     assert "研究型卖出指标" in report
     assert "卖出规则历史验证" in report
