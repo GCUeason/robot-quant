@@ -14,6 +14,8 @@ from robot_quant.model import PredictionConfig, WalkForwardPredictor
 from robot_quant.pipeline import build_execution_frame
 from robot_quant.portfolio import PortfolioConfig, PortfolioSimulator
 from robot_quant.report import write_outputs
+from robot_quant.robot_chain import fetch_robot_chain_prices, simulate_robot_chain
+from robot_quant.robot_chain_report import write_robot_chain_outputs
 
 
 @dataclass(frozen=True)
@@ -79,6 +81,8 @@ def run_daily(
         state.update(indicators)
         state["data_provenance"] = _data_provenance(bundle)
         write_outputs(history, state, output_path)
+        if offline_data_dir is None:
+            run_robot_chain_daily(output_path)
         return state
 
     simulation_execution.iloc[
@@ -112,6 +116,18 @@ def run_daily(
     state.update(indicators)
     state["data_provenance"] = _data_provenance(bundle)
     write_outputs(history, state, output_path)
+    if offline_data_dir is None:
+        run_robot_chain_daily(output_path)
+    return state
+
+
+def run_robot_chain_daily(output_root: str | Path = ".") -> dict:
+    """更新独立的机器人产业链个股纸面账户。"""
+
+    output_path = Path(output_root)
+    prices = fetch_robot_chain_prices()
+    history, state = simulate_robot_chain(prices)
+    write_robot_chain_outputs(history, state, output_path)
     return state
 
 

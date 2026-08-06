@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 from collections.abc import Sequence
 
-from robot_quant.runner import run_daily
+from robot_quant.runner import run_daily, run_robot_chain_daily
 
 
 def main(argv: Sequence[str] | None = None) -> None:
@@ -14,6 +14,8 @@ def main(argv: Sequence[str] | None = None) -> None:
     run_parser = subparsers.add_parser("run-daily", help="更新预测与模拟账户")
     run_parser.add_argument("--offline-data-dir")
     run_parser.add_argument("--output-root", default=".")
+    chain_parser = subparsers.add_parser("run-robot-chain-paper", help="更新机器人产业链纸面账户")
+    chain_parser.add_argument("--output-root", default=".")
     args = parser.parse_args(argv)
 
     if args.command == "run-daily":
@@ -26,4 +28,11 @@ def main(argv: Sequence[str] | None = None) -> None:
             f"{state['prediction_probability']:.2%} | "
             f"研究仓位 {state['research_target_weight']:.0%}（不可执行） | "
             f"固定定投仓位 {state['executable_target_weight']:.0%}"
+        )
+    elif args.command == "run-robot-chain-paper":
+        state = run_robot_chain_daily(output_root=args.output_root)
+        print(
+            f"{state['market_date']} | 产业链纸面账户市值 "
+            f"¥{state['portfolio_value']:,.2f} | "
+            f"累计盈亏 ¥{state['profit']:,.2f}"
         )

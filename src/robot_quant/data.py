@@ -106,7 +106,8 @@ class TencentDataSource:
             raise ValueError(f"行情返回为空: {symbol}")
 
         columns = ["date", "open", "close", "high", "low", "volume"]
-        frame = pd.DataFrame(rows, columns=columns)
+        # 腾讯会在除权除息日附加第七列公司行动元数据；日线价格字段仍保持前六列。
+        frame = pd.DataFrame([row[: len(columns)] for row in rows], columns=columns)
         frame["date"] = pd.to_datetime(frame["date"])
         for column in columns[1:]:
             frame[column] = pd.to_numeric(frame[column], errors="coerce")

@@ -2,12 +2,14 @@
 
 [![Daily prediction and simulation](https://github.com/GCUeason/robot-quant/actions/workflows/daily.yml/badge.svg)](https://github.com/GCUeason/robot-quant/actions/workflows/daily.yml)
 
-针对机器人ETF易方达（`159530`）的公开、可复现量化实验。项目每天收盘后更新研究信号，并从2026年7月20日起跟踪既定现金流：
+针对机器人主题的公开、可复现量化实验。项目每天收盘后更新两套彼此独立的纸面账户：
 
 - **固定定投**：2026年7月20日首次买入 ¥15,000，随后从次月起每月首个交易日投入 ¥1,000，并始终尽量满仓ETF。
 - **模型观察层**：保留滚动模型的0%、50%或100%原始研究仓位；逐日成熟样本门控只控制最高20%的不可执行影子卫星仓，不允许模型改变真实可执行模拟仓位。
 
 当前固定定投是唯一可执行模拟。“质量门控定投”与固定定投使用相同仓位，因此两者绩效应完全一致；这用于证明未验证模型确实没有暗中参与交易。
+
+**机器人产业链个股纸面账户**从2026年8月6日以¥50,000开始，持有上游零部件、中游本体和下游应用各一组标的，保留现金风险覆盖。它不使用ETF、融资、融券、期货或期权；连续3日跌破20日均线、组合回撤8%/12%时只在下一交易日执行预先写明的纸面减仓规则。该账户尚未通过样本外Alpha验证，不产生真实下单指令。
 
 ## 最新结果
 
@@ -15,8 +17,14 @@
 - [下载完整账户历史](data/portfolio_history.csv)
 - [查看机器可读状态](data/latest_state.json)
 - [查看模型置信度、校准与备选方案核验](research/model-confidence-2026-07-17.md)
+- [查看产业链个股纸面账户日报](reports/robot_chain_latest.md)
+- [下载产业链个股账户历史](data/robot_chain_history.csv)
+- [查看产业链个股机器状态](data/robot_chain_latest_state.json)
+- [查看产业链个股建仓与风控口径](research/robot-industry-chain-paper-model-2026-08-06.md)
 
 ![质量门控定投与固定定投累计市值](reports/performance.png)
+
+![产业链个股纸面账户市值](reports/robot_chain_performance.png)
 
 ## 模型方法
 
@@ -66,6 +74,8 @@
 - ETF与沪深300行情来源：腾讯证券公开行情接口；机器人指数来源：国证指数官网公开历史行情接口；
 - 定时运行：工作日北京时间16:30，由GitHub Actions触发。GitHub定时任务可能排队延迟。
 
+同一GitHub Actions运行还会更新机器人产业链个股纸面账户。每日输出独立写入`data/robot_chain_history.csv`、`data/robot_chain_latest_state.json`、`reports/robot_chain_latest.md`和`reports/robot_chain_performance.png`，不覆盖ETF模型的日报和历史。
+
 2026年7月20日之前的行情仅用于训练模型，不计入账户收益。模拟账户从计划开始日完整重算，因此对同一份行情重复运行不会重复定投。首次建仓按用户设定的100%目标仓位执行，后续固定定投继续保持100%可执行目标仓位；模型给出的0%、50%或100%只记录为研究字段。结果文件由定时任务自动提交回仓库。
 
 ## 本地运行
@@ -76,6 +86,7 @@ source .venv/bin/activate
 python -m pip install ".[dev]"
 python -m pytest
 robot-quant run-daily
+robot-quant run-robot-chain-paper
 ```
 
 ## 风险说明

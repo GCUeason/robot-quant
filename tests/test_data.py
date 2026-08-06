@@ -56,6 +56,33 @@ def test_tencent_payload_is_parsed_into_sorted_numeric_daily_prices() -> None:
     assert prices.loc["2026-07-17", "close"] == 1.336
 
 
+def test_tencent_payload_ignores_corporate_action_metadata_column() -> None:
+    payload = {
+        "code": 0,
+        "msg": "",
+        "data": {
+            "sz159530": {
+                "qfqday": [
+                    [
+                        "2026-07-17",
+                        "1.325",
+                        "1.336",
+                        "1.340",
+                        "1.310",
+                        "234567",
+                        {"FHcontent": "10派0.2元"},
+                    ]
+                ]
+            }
+        },
+    }
+
+    prices = TencentDataSource._parse_payload(payload, "sz159530")
+
+    assert prices.loc["2026-07-17", "close"] == 1.336
+    assert prices.loc["2026-07-17", "volume"] == 234567
+
+
 def test_tencent_payload_rejects_missing_history() -> None:
     payload = {"code": 0, "msg": "", "data": {"sz159530": {}}}
 
