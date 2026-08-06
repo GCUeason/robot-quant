@@ -65,9 +65,9 @@
       "upper_bound": 0.21684990222753137
     },
     {
-      "current_value": 0.5385797067333458,
+      "current_value": 0.5385797067333457,
       "feature": "volatility_20",
-      "lower_bound": 0.11928679614426224,
+      "lower_bound": 0.11928679614426299,
       "status": "in_range",
       "training_sample_count": 2684,
       "upper_bound": 0.8245348628082524
@@ -167,7 +167,7 @@
       "expected_price": null,
       "expected_profit_on_capital": null,
       "loss_probability": null,
-      "maximum_similarity_distance": 2.2075916962505304,
+      "maximum_similarity_distance": 2.207591696250528,
       "mean_return": null,
       "median_return": null,
       "regime_match_count": 959,
@@ -308,7 +308,7 @@
     "passes_regime_stability": false,
     "passes_stability": false,
     "passes_time_stability": false,
-    "raw_brier": 0.2519552433160297,
+    "raw_brier": 0.25195524331602975,
     "regime_windows": [
       {
         "brier": 0.2500863508372129,
@@ -318,21 +318,21 @@
         "sample_count": 1126
       },
       {
-        "brier": 0.24682164323009131,
+        "brier": 0.24682164323009126,
         "passes": true,
         "regime": "up_high_vol",
         "roc_auc": 0.6081547619047619,
         "sample_count": 260
       },
       {
-        "brier": 0.2504393295995423,
+        "brier": 0.25043932959954224,
         "passes": false,
         "regime": "down_low_vol",
         "roc_auc": 0.47239828308530596,
         "sample_count": 888
       },
       {
-        "brier": 0.2451814063223948,
+        "brier": 0.24518140632239485,
         "passes": true,
         "regime": "down_high_vol",
         "roc_auc": 0.5450292397660819,
@@ -356,7 +356,7 @@
         "window_kind": "fixed_block"
       },
       {
-        "brier": 0.23742155642188126,
+        "brier": 0.2374215564218813,
         "end_date": "2016-12-27",
         "passes": true,
         "passes_auc_baseline": true,
@@ -367,7 +367,7 @@
         "window_kind": "fixed_block"
       },
       {
-        "brier": 0.25910715895488695,
+        "brier": 0.259107158954887,
         "end_date": "2017-03-15",
         "passes": false,
         "passes_auc_baseline": false,
@@ -455,7 +455,7 @@
         "window_kind": "fixed_block"
       },
       {
-        "brier": 0.2464859737762554,
+        "brier": 0.24648597377625536,
         "end_date": "2018-11-02",
         "passes": true,
         "passes_auc_baseline": true,
@@ -466,7 +466,7 @@
         "window_kind": "fixed_block"
       },
       {
-        "brier": 0.24683169530834628,
+        "brier": 0.24683169530834626,
         "end_date": "2019-01-15",
         "passes": true,
         "passes_auc_baseline": true,
@@ -554,7 +554,7 @@
         "window_kind": "fixed_block"
       },
       {
-        "brier": 0.26439494489832416,
+        "brier": 0.2643949448983241,
         "end_date": "2020-09-07",
         "passes": false,
         "passes_auc_baseline": false,
@@ -598,7 +598,7 @@
         "window_kind": "fixed_block"
       },
       {
-        "brier": 0.26042257015146203,
+        "brier": 0.2604225701514621,
         "end_date": "2021-07-07",
         "passes": false,
         "passes_auc_baseline": false,
@@ -609,7 +609,7 @@
         "window_kind": "fixed_block"
       },
       {
-        "brier": 0.25726784602339053,
+        "brier": 0.2572678460233904,
         "end_date": "2021-09-15",
         "passes": false,
         "passes_auc_baseline": false,
@@ -642,7 +642,7 @@
         "window_kind": "fixed_block"
       },
       {
-        "brier": 0.2571280097450074,
+        "brier": 0.25712800974500744,
         "end_date": "2022-05-09",
         "passes": false,
         "passes_auc_baseline": true,
@@ -708,7 +708,7 @@
         "window_kind": "fixed_block"
       },
       {
-        "brier": 0.2488533484306068,
+        "brier": 0.24885334843060675,
         "end_date": "2023-07-28",
         "passes": true,
         "passes_auc_baseline": true,
@@ -741,7 +741,7 @@
         "window_kind": "fixed_block"
       },
       {
-        "brier": 0.23780016912085755,
+        "brier": 0.2378001691208576,
         "end_date": "2024-03-13",
         "passes": true,
         "passes_auc_baseline": true,
@@ -796,7 +796,7 @@
         "window_kind": "fixed_block"
       },
       {
-        "brier": 0.24590689983624103,
+        "brier": 0.24590689983624106,
         "end_date": "2025-03-26",
         "passes": true,
         "passes_auc_baseline": true,
@@ -818,7 +818,7 @@
         "window_kind": "fixed_block"
       },
       {
-        "brier": 0.2529359497224029,
+        "brier": 0.25293594972240296,
         "end_date": "2025-08-20",
         "passes": false,
         "passes_auc_baseline": false,
@@ -851,7 +851,7 @@
         "window_kind": "fixed_block"
       },
       {
-        "brier": 0.24644306387486087,
+        "brier": 0.2464430638748608,
         "end_date": "2026-04-08",
         "passes": true,
         "passes_auc_baseline": true,
@@ -862,7 +862,7 @@
         "window_kind": "fixed_block"
       },
       {
-        "brier": 0.24454290878132046,
+        "brier": 0.24454290878132048,
         "end_date": "2026-06-23",
         "passes": true,
         "passes_auc_baseline": true,
@@ -894,7 +894,7 @@
   "prediction_probability": 0.5403341707390665,
   "probability_shrinkage": 0.25,
   "quality_gate_auc": 0.3912337662337662,
-  "quality_gate_brier": 0.25336269005952494,
+  "quality_gate_brier": 0.2533626900595249,
   "quality_gate_passed": false,
   "quality_gate_reason": "最近成熟窗口未同时通过Brier<0.25与AUC>0.5",
   "quality_gate_sample_count": 50,
@@ -903,7 +903,7 @@
   "sell_indicators": {
     "action": "unavailable",
     "current_market_trend_120": -0.017248166875930337,
-    "current_volatility_20": 0.5385797067333458,
+    "current_volatility_20": 0.5385797067333457,
     "exit_loss_probability_trigger": 0.65,
     "probability_exit_trigger": 0.35,
     "probability_reduce_trigger": 0.45,
