@@ -1,0 +1,20 @@
+{
+  "phase": "PREPARE",
+  "as_of": "2026-08-19",
+  "generated_at": "2026-08-19T14:17:24.273507+08:00",
+  "scheduled_at": "2026-08-19T08:45:00+08:00",
+  "started_at": "2026-08-19T14:17:24.273507+08:00",
+  "execution_permission": "PAPER_ONLY",
+  "real_trade_authorized": false,
+  "current_new_entry_allowed": false,
+  "retryable": false,
+  "status": "READY",
+  "baseline_as_of": "2026-08-18",
+  "updated_trading_days": 2,
+  "baseline_coverage": 1.0,
+  "reason": null,
+  "source_commit": "77188c516ffd47872f602cc89071301f4e1702e8",
+  "source_manifest_sha256": "3178515b20407dc65e6678c3d5c1dc3308c7e5a31e4d751ffed2445b448596aa",
+  "finished_at": "2026-08-19T14:20:43.785708+08:00",
+  "payload_sha256": "3e34d235c647bdfddf8fec4548c56ac9a01eb08ff23789f0d81185d9ebcdbe26"
+}
