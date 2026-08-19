@@ -1,9 +1,9 @@
 {
   "phase": "RESEARCH",
   "as_of": "2026-08-19",
-  "generated_at": "2026-08-19T16:42:34.516352+08:00",
+  "generated_at": "2026-08-19T16:48:31.846548+08:00",
   "scheduled_at": "2026-08-19T16:35:00+08:00",
-  "started_at": "2026-08-19T16:42:34.516352+08:00",
+  "started_at": "2026-08-19T16:48:31.846548+08:00",
   "execution_permission": "PAPER_ONLY",
   "real_trade_authorized": false,
   "current_new_entry_allowed": false,
@@ -26,8 +26,8 @@
     "reason": "盘后基线截止2026-08-14，尚未到2026-08-19"
   },
   "promotion_gate": "FAIL",
-  "source_commit": "47b066a65c7b6c448953caa33c9aafe5da3d576d",
-  "source_manifest_sha256": "708ecf09947d61fdb2a1494d17a4aa84f3360f1fba508f22b88b8b78e939616b",
-  "finished_at": "2026-08-19T16:46:24.421284+08:00",
-  "payload_sha256": "3bd2964d4395dc05b75e06f878d024977fe343e69a67e79ba42edfa2942f67c3"
+  "source_commit": "c8d26fd1ec76337ffad54eeb6748abbd71b66423",
+  "source_manifest_sha256": "aed3f37e6e8efa29f013b39bc5e63048e74e632379eefa1792c3e8f798059eab",
+  "finished_at": "2026-08-19T16:52:18.391597+08:00",
+  "payload_sha256": "14ce78b48dea40209e859afb5c809a81211c3af787023c1f31c994cd13903a1e"
 }
