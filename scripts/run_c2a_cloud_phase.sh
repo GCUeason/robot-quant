@@ -21,6 +21,7 @@ cd "$project_root" || {
 }
 project_root="$(pwd -P)"
 failure_recorder="${project_root}/scripts/record_c2a_failure.py"
+trusted_head=""
 
 phase_paths() {
   paths=(
@@ -90,21 +91,49 @@ git_network() {
 }
 
 push_with_rebase_retry() {
+  local result_commit="$1"
   local attempt
+  local ahead_count
+  local origin_head
+  local parent_commit
   for attempt in 1 2 3; do
-    if git_network push origin HEAD:main; then
+    origin_head="$(git rev-parse origin/main)" || return 1
+    if git merge-base --is-ancestor "$result_commit" origin/main; then
+      return 0
+    fi
+    ahead_count="$(git rev-list --count origin/main.."$result_commit")" || return 1
+    parent_commit="$(git rev-parse "${result_commit}^")" || return 1
+    if [[ "$ahead_count" != "1" || "$parent_commit" != "$origin_head" ]]; then
+      echo "拒绝推送非单一受控结果提交" >&2
+      return 1
+    fi
+    if git_network push origin "${result_commit}:main"; then
       return 0
     fi
     git_network fetch origin main || continue
+    if git merge-base --is-ancestor "$result_commit" origin/main; then
+      return 0
+    fi
+    if [[ "$(git rev-parse HEAD)" != "$result_commit" ]]; then
+      echo "阶段运行期间云端 HEAD 发生变化" >&2
+      return 1
+    fi
     if ! git rebase origin/main; then
       git rebase --abort >/dev/null 2>&1 || true
       return 1
     fi
+    result_commit="$(git rev-parse HEAD)" || return 1
   done
   return 1
 }
 
 publish_phase_results() {
+  local result_commit
+  local result_parent
+  if [[ -z "$trusted_head" || "$(git rev-parse HEAD)" != "$trusted_head" ]]; then
+    echo "阶段运行期间云端 HEAD 发生变化" >&2
+    return 1
+  fi
   stage_phase_results || return 1
   if [[ "${#staged_paths[@]}" -eq 0 ]] || \
     git diff --cached --quiet -- "${staged_paths[@]}"; then
@@ -116,7 +145,13 @@ publish_phase_results() {
   git config user.email "robot-quant-cloud[bot]@users.noreply.github.com"
   git commit --only -m "chore: update C2-A ${phase} report ${trade_day}" -- \
     "${staged_paths[@]}" || return 1
-  push_with_rebase_retry
+  result_commit="$(git rev-parse HEAD)" || return 1
+  result_parent="$(git rev-parse "${result_commit}^")" || return 1
+  if [[ "$result_parent" != "$trusted_head" ]]; then
+    echo "拒绝发布非可信基线上的结果提交" >&2
+    return 1
+  fi
+  push_with_rebase_retry "$result_commit"
 }
 
 publish_failure_outbox() {
@@ -139,6 +174,7 @@ publish_failure_outbox() {
       --project-root "$outbox_repo" --phase "$phase" --date "$trade_day" --reason "$reason" \
       || exit 1
     cd "$outbox_repo" || exit 1
+    trusted_head="$(git rev-parse HEAD)" || exit 1
     publish_phase_results
   )
 }
@@ -195,6 +231,8 @@ if ! git rebase origin/main; then
   git rebase --abort >/dev/null 2>&1 || true
   fail_phase_outbox "云端仓库无法同步 origin/main" 1
 fi
+trusted_head="$(git rev-parse HEAD)" || fail_phase_outbox \
+  "云端仓库无法确定可信基线" 1
 
 if [[ ! -x "$python_bin" ]]; then
   fail_phase "云端虚拟环境解释器不可用" 1

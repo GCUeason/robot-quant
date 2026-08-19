@@ -118,7 +118,7 @@ def test_systemd_timers_use_shanghai_wall_clock_without_random_delay() -> None:
     service = (ROOT / "deploy/systemd/robot-quant-c2a@.service").read_text(encoding="utf-8")
     assert "Restart=on-failure" in service
     assert "StartLimitBurst=3" in service
-    assert "InaccessiblePaths=/usr/local/etc/xray" in service
+    assert "InaccessiblePaths=-/usr/local/etc/xray" in service
 
 
 def test_dependency_free_failure_recorder_clears_stale_scan(tmp_path) -> None:
@@ -213,6 +213,51 @@ def test_unpushed_cloud_commit_is_rejected_and_not_pushed(tmp_path) -> None:
     assert payload["status"] == "DATA_NOT_READY"
     assert "未推送的本地提交" in payload["reason"]
     assert not (inspect / "LOCAL_ONLY.txt").exists()
+
+
+def test_commit_created_during_phase_is_not_pushed(tmp_path) -> None:
+    remote, _, cloud, environment = _cloud_repository(tmp_path)
+    inspect = tmp_path / "inspect"
+    phase_python = tmp_path / "phase-python"
+    phase_python.write_text(
+        """#!/usr/bin/env python3
+import subprocess
+import sys
+from pathlib import Path
+
+if sys.argv[1:4] != ["-m", "robot_quant.c2a_cloud", "scan"]:
+    raise SystemExit(1)
+Path("LOCAL_DURING.txt").write_text("must not be published\\n", encoding="utf-8")
+subprocess.run(["git", "config", "user.name", "phase"], check=True)
+subprocess.run(["git", "config", "user.email", "phase@example.com"], check=True)
+subprocess.run(["git", "add", "LOCAL_DURING.txt"], check=True)
+subprocess.run(["git", "commit", "-m", "commit during phase"], check=True)
+result = Path("data/c2a_results/cloud_scan_latest.json")
+result.parent.mkdir(parents=True, exist_ok=True)
+result.write_text("{}\\n", encoding="utf-8")
+""",
+        encoding="utf-8",
+    )
+    phase_python.chmod(0o755)
+    environment["ROBOT_QUANT_PYTHON"] = str(phase_python)
+
+    completed = subprocess.run(
+        [str(ROOT / "scripts/run_c2a_cloud_phase.sh"), "scan"],
+        env=environment,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert completed.returncode == 1
+    subprocess.run(
+        ["git", "clone", str(remote), str(inspect)],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    assert not (inspect / "LOCAL_DURING.txt").exists()
+    assert not (inspect / "data/c2a_results/cloud_scan_latest.json").exists()
 
 
 def test_diverged_cloud_history_publishes_failure_from_clean_outbox(tmp_path) -> None:
