@@ -45,10 +45,18 @@ ROBOT_QUANT_PROJECT_ROOT=/srv/robot-quant
 ROBOT_QUANT_PYTHON=/srv/robot-quant/.venv/bin/python
 C2A_SSH_HOST=bigquant-aistudio
 C2A_REMOTE_ROOT=/home/aiuser/work/robot-quant
+# 当前账号未开通 cn_stock_bar1m_c 时设为 0，禁止重复请求确定性失败的研究任务
+C2A_BIGQUANT_RESEARCH_ENTITLED=0
 ```
 
 SSH 别名由云端服务用户自己的 `~/.ssh/config` 提供。私钥路径和实际用户名仅保存在云端，
 不进入此文件示例或 GitHub。
+
+`C2A_BIGQUANT_RESEARCH_ENTITLED=0` 时，16:35 阶段仍会用公开行情独立更新下一交易日
+FastPack，但只标记为 `PROXY / PAPER_ONLY`；严格研究写为
+`DATA_NOT_READY / BIGQUANT_ENTITLEMENT_DENIED`，总状态为 `PARTIAL` 且不重试。只有确实获得
+`cn_stock_bar1m_c` 权限并完成严格流水线后，才能把该变量设为 `1`。公开基线不能冒充
+BigQuant 严格研究结果。
 
 ## 安装 timers
 
@@ -102,6 +110,16 @@ systemd 每两分钟重试，30 分钟内最多三次。锁只等待 90 秒；�
 `DATA_NOT_READY/PARTIAL` 会让服务返回临时失败码，
 从而触发上述有限重试；错误时点等确定性失败不会无限重跑。
 
+研究状态不是 `READY`、研究组件不是 `COMPLETED`、日期不符或 payload 哈希无效时，发布器
+只允许写回四份当日阶段状态文件，不发布基线曲线、交易明细、训练网格等研究产物。这样旧的
+成功研究文件即使仍在云主机磁盘，也不会被失败阶段重新当作当日结果提交。
+
+严格研究启用后，每次流水线使用唯一的远端隔离输出目录；除明确标记为
+`CARRIED_FORWARD` 的优化文件外，不从 canonical 结果目录预填内容。成功报告必须绑定固定
+研究产物集合的逐文件 SHA-256，发布前再次检查完整集合、普通文件、非符号链接和内容哈希；
+任一文件缺失或不匹配都降级为只发布四份状态文件。FastPack 写回 AIStudio 时同样先进入远端
+同盘暂存目录，完整校验且确认日期不早于远端权威版本后再提升，传输失败不直接改写权威包。
+
 现有 `.github/workflows/daily.yml` 同样使用结果白名单。不要恢复 `git add data/ reports/`
 这类宽泛写法。
 
@@ -112,7 +130,9 @@ systemd 每两分钟重试，30 分钟内最多三次。锁只等待 90 秒；�
 1. 08:45 产物日期正确，`baseline_as_of` 为上一交易日；
 2. 10:02:30 启动并目标在 10:03 前生成当日日期化扫描；超时标记 `LATE`，失败时 `entries=[]` 且没有旧信号；
 3. 16:30 读取同一天早盘扫描，并且只用当日 15:00 后快照复盘；若来源为 `LATE / RECONSTRUCTED`，结果必须标记 `RECONSTRUCTED_REVIEW`，不得算作准点闭环；
-4. 16:35 独立启动研究流水线，下一交易日基线截止更新到当日；
+4. 16:35 独立启动研究阶段，下一交易日基线截止更新到当日；若严格数据权限未开通，必须是
+   `PARTIAL`，基线为 `READY / PROXY`，研究为
+   `DATA_NOT_READY / BIGQUANT_ENTITLEMENT_DENIED`，且不触发重复请求；
 5. 四阶段报告均由云端提交到 GitHub，可从另一台电脑查看；
 6. 在一个工作日休市场景中确认盘后阶段为 `DATA_NOT_READY`；
 7. 仓库历史中不存在私钥、Token、原始分钟数据和 pickle 缓存；

@@ -102,6 +102,12 @@ def test_strict_store_runs_end_to_end_and_writes_result_report(tmp_path) -> None
     assert state["research_cache"]["processed_days"] == 22
     assert (tmp_path / "reports" / "c2a_2026_report.md").exists()
     assert (tmp_path / "data" / "c2a_results" / "baseline_trades.csv").exists()
+    written_audit = json.loads(
+        (tmp_path / "data" / "c2a_results" / "data_audit.json").read_text(encoding="utf-8")
+    )
+    assert written_audit["status"] == "STRICT"
+    assert written_audit["end_date"] == dates[21].date().isoformat()
+    assert written_audit["reasons"] == []
     events = pd.read_csv(tmp_path / "data" / "c2a_results" / "baseline_events.csv")
     assert {"SIGNAL", "ENTRY"}.issubset(set(events["event"]))
 
@@ -123,12 +129,27 @@ def test_strict_store_runs_end_to_end_and_writes_result_report(tmp_path) -> None
         "promotion_gate": "FAIL",
         "candidate_count": 720,
     }
-    (tmp_path / "data" / "c2a_results" / "latest_state.json").write_text(
-        json.dumps(prior_state), encoding="utf-8"
-    )
+    results_dir = tmp_path / "data" / "c2a_results"
+    prior_results = tmp_path / ".private-prior-results"
+    prior_results.mkdir()
+    (prior_results / "latest_state.json").write_text(json.dumps(prior_state), encoding="utf-8")
+    for name in (
+        "walk_forward_selections.csv",
+        "walk_forward_oos_trades.csv",
+        "latest_training_grid.csv",
+    ):
+        (prior_results / name).write_bytes((results_dir / name).read_bytes())
+    for name in (
+        "latest_state.json",
+        "walk_forward_selections.csv",
+        "walk_forward_oos_trades.csv",
+        "latest_training_grid.csv",
+    ):
+        (results_dir / name).unlink()
     carried = run_c2a_backtest(
         data_root=store.root,
         output_root=tmp_path,
+        prior_results_root=prior_results,
         start_date=dates[20],
         end_date=dates[21],
         variant="v1.2",
@@ -136,6 +157,18 @@ def test_strict_store_runs_end_to_end_and_writes_result_report(tmp_path) -> None
     )
     assert carried["walk_forward"]["status"] == "CARRIED_FORWARD"
     assert carried["walk_forward"]["optimization_as_of"] == dates[21].date().isoformat()
+    assert (
+        json.loads((results_dir / "latest_state.json").read_text(encoding="utf-8"))["as_of"]
+        == dates[21].date().isoformat()
+    )
+    assert all(
+        (results_dir / name).is_file()
+        for name in (
+            "walk_forward_selections.csv",
+            "walk_forward_oos_trades.csv",
+            "latest_training_grid.csv",
+        )
+    )
 
 
 def test_challenger_reuses_v12_feature_cache(tmp_path) -> None:

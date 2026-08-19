@@ -164,7 +164,7 @@ robot-quant c2a-backtest --start 2026-01-01 --variant v1.2
 14.7～16.9秒，实际耗时会随公共行情网络波动。终端中的`ENTRY`始终是纸面模拟成交，
 `WATCHLIST`只是尚未通过回撤入场门槛的观察项；两者均不连接券商。
 
-本地 PyCharm 可用于开发和手工核验，但长驻进程不作为云端主调度器。生产化入口是 `python -m robot_quant.c2a_cloud prepare|scan|review|research`：持续在线 Linux 主机在工作日08:45准备基线、10:02:30启动扫描并目标在10:03前发布、16:30快速核对当天早盘信号、16:35再启动研究流水线并更新下一交易日基线。扫描若超过信号有效期会如实标记 `LATE`；若来源扫描为 `LATE / RECONSTRUCTED`，16:30 只输出 `RECONSTRUCTED_REVIEW`（事后重建复盘），不得计入准点闭环。各盘后阶段均先验证当日15:00后的行情；休市或行情陈旧时只写 `DATA_NOT_READY`。GitHub Actions 定时任务可能严重排队，因此只负责既有收盘日报和手工补跑，不承担 C2-A 的准点主时钟。完整安全边界、systemd 单元和上线验收见 [C2-A 云端部署说明](docs/c2a-cloud-deployment.md)。
+本地 PyCharm 可用于开发和手工核验，但长驻进程不作为云端主调度器。生产化入口是 `python -m robot_quant.c2a_cloud prepare|scan|review|research`：持续在线 Linux 主机在工作日08:45准备基线、10:02:30启动扫描并目标在10:03前发布、16:30快速核对当天早盘信号、16:35再启动研究阶段并更新下一交易日基线。扫描若超过信号有效期会如实标记 `LATE`；若来源扫描为 `LATE / RECONSTRUCTED`，16:30 只输出 `RECONSTRUCTED_REVIEW`（事后重建复盘），不得计入准点闭环。各盘后阶段均先验证当日15:00后的行情；休市或行情陈旧时只写 `DATA_NOT_READY`。BigQuant 严格分钟表权限未开通时，16:35 只把公开行情 FastPack 标为 `READY / PROXY`，严格研究保持 `DATA_NOT_READY`，总状态为 `PARTIAL`，不得把公共基线冒充严格研究完成。GitHub Actions 定时任务可能严重排队，因此只负责既有收盘日报和手工补跑，不承担 C2-A 的准点主时钟。完整安全边界、systemd 单元和上线验收见 [C2-A 云端部署说明](docs/c2a-cloud-deployment.md)。
 
 C2-A 云端产物按日期保存。任何阶段失败都会覆盖 `latest` 为当日 `DATA_NOT_READY` 空候选，不会回忆或沿用昨日信号；`data/c2a/`、`data/c2a_fast/`、参数 pickle、SSH 私钥及 API 凭证均禁止提交到 GitHub。
 

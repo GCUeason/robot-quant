@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-import json
 import hashlib
+import json
+import shutil
 from datetime import date, timedelta
 from pathlib import Path
 
@@ -45,6 +46,18 @@ def _write_text_atomic(text: str, path: Path) -> None:
     temporary.replace(path)
 
 
+def _copy_file_atomic(source: Path, destination: Path) -> None:
+    if source.is_symlink() or not source.is_file():
+        raise RuntimeError(f"C2-A carried-forward 输入不是安全普通文件: {source.name}")
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    temporary = destination.with_name(f".{destination.name}.tmp")
+    try:
+        shutil.copy2(source, temporary)
+        temporary.replace(destination)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
 def run_c2a_audit(
     data_root: str | Path = "data/c2a",
     output_root: str | Path = ".",
@@ -80,6 +93,7 @@ def run_c2a_backtest(
     end_date: date | str | None = None,
     variant: str = "v1.2",
     *,
+    prior_results_root: str | Path | None = None,
     allow_proxy: bool = False,
     optimize: bool = True,
     max_candidates: int | None = None,
@@ -126,9 +140,16 @@ def run_c2a_backtest(
     )
     output = Path(output_root)
     data_dir = output / "data" / "c2a_results"
+    prior_data_dir = (
+        Path(prior_results_root).resolve() if prior_results_root is not None else data_dir.resolve()
+    )
     reports_dir = output / "reports"
     data_dir.mkdir(parents=True, exist_ok=True)
     reports_dir.mkdir(parents=True, exist_ok=True)
+    _write_text_atomic(
+        json.dumps(audit.to_dict(), ensure_ascii=False, indent=2),
+        data_dir / "data_audit.json",
+    )
     selections = pd.DataFrame()
     oos_trades = pd.DataFrame()
     latest_training_grid = pd.DataFrame()
@@ -163,7 +184,7 @@ def run_c2a_backtest(
         optimization_summary["candidate_count"] = len(candidates)
         optimization_summary["optimization_as_of"] = pd.Timestamp(final_date).date().isoformat()
     else:
-        prior = _load_prior_optimization(data_dir)
+        prior = _load_prior_optimization(prior_data_dir)
         if prior is not None:
             optimization_summary, selections = prior
             optimization_summary["status"] = "CARRIED_FORWARD"
@@ -175,6 +196,13 @@ def run_c2a_backtest(
         _write_csv_atomic(selections, data_dir / "walk_forward_selections.csv")
         _write_csv_atomic(oos_trades, data_dir / "walk_forward_oos_trades.csv")
         _write_csv_atomic(latest_training_grid, data_dir / "latest_training_grid.csv")
+    elif prior_data_dir != data_dir.resolve():
+        for name in (
+            "walk_forward_selections.csv",
+            "walk_forward_oos_trades.csv",
+            "latest_training_grid.csv",
+        ):
+            _copy_file_atomic(prior_data_dir / name, data_dir / name)
     daily_signal = _daily_signal_summary(
         baseline_events,
         universe,
@@ -208,7 +236,13 @@ def run_c2a_backtest(
 def _load_prior_optimization(data_dir: Path) -> tuple[dict, pd.DataFrame] | None:
     state_path = data_dir / "latest_state.json"
     selections_path = data_dir / "walk_forward_selections.csv"
-    if not state_path.exists():
+    required_paths = (
+        state_path,
+        selections_path,
+        data_dir / "walk_forward_oos_trades.csv",
+        data_dir / "latest_training_grid.csv",
+    )
+    if any(path.is_symlink() or not path.is_file() for path in required_paths):
         return None
     try:
         prior = json.loads(state_path.read_text(encoding="utf-8"))

@@ -30,6 +30,7 @@ from robot_quant.c2a_fast import (
 from robot_quant.c2a_remote import (
     DEFAULT_HOST,
     DEFAULT_REMOTE_ROOT,
+    REMOTE_RESULT_ALLOWLIST,
     export_remote_fast_pack,
     fetch_remote_fast_pack,
     push_remote_fast_pack,
@@ -53,6 +54,8 @@ PHASE_SCHEDULES = {
     "research": time(16, 35),
 }
 TRUTHY_ENV_VALUES = {"1", "true", "yes", "on"}
+RESEARCH_ARTIFACT_PATHS = frozenset(REMOTE_RESULT_ALLOWLIST)
+SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 
 
 def _write_json_atomic(payload: dict, path: Path) -> None:
@@ -78,6 +81,21 @@ def _safe_error(error: Exception) -> str:
     message = str(error).replace("\n", " ").strip()
     message = re.sub(r"/(?:Users|home)/[^\s:]+", "<private-path>", message)
     return message[:500] or type(error).__name__
+
+
+def _validated_research_artifact_sha256(value: object) -> dict[str, str]:
+    """收紧远端研究产物合同：必须是完整固定集合且每项为 SHA256。"""
+
+    if not isinstance(value, dict) or set(value) != RESEARCH_ARTIFACT_PATHS:
+        raise RuntimeError("C2-A 研究产物哈希清单不完整")
+    if any(
+        not isinstance(path, str)
+        or not isinstance(digest, str)
+        or not SHA256_PATTERN.fullmatch(digest)
+        for path, digest in value.items()
+    ):
+        raise RuntimeError("C2-A 研究产物哈希清单格式无效")
+    return dict(sorted(value.items()))
 
 
 def _remote_settings() -> tuple[str, str]:
@@ -389,6 +407,7 @@ def run_research_phase(
                     "status": "DATA_NOT_READY",
                     "optimized": should_optimize,
                     "reason": _safe_error(error),
+                    "artifact_sha256": {},
                 },
                 "next_session_baseline": {
                     "status": "DATA_NOT_READY",
@@ -428,6 +447,7 @@ def run_research_phase(
     research_reason = None
     research_reason_code = None
     research_retryable = False
+    research_artifact_sha256: dict[str, str] = {}
     research_entitled = (
         os.environ.get("C2A_BIGQUANT_RESEARCH_ENTITLED", "1").strip().lower() in TRUTHY_ENV_VALUES
     )
@@ -437,20 +457,23 @@ def run_research_phase(
         research_reason_code = "BIGQUANT_ENTITLEMENT_DENIED"
     else:
         try:
-            run_remote_pipeline(
-                root,
-                (day - timedelta(days=45)).isoformat(),
-                day.isoformat(),
-                optimize=should_optimize,
-                variant="v1.2-challenger",
-                host=host,
-                remote_root=remote_root,
+            research_artifact_sha256 = _validated_research_artifact_sha256(
+                run_remote_pipeline(
+                    root,
+                    (day - timedelta(days=45)).isoformat(),
+                    day.isoformat(),
+                    optimize=should_optimize,
+                    variant="v1.2-challenger",
+                    host=host,
+                    remote_root=remote_root,
+                )
             )
         except (RuntimeError, ValueError, OSError) as error:
             research_status = "DATA_NOT_READY"
             research_reason = _safe_error(error)
             research_reason_code = "REMOTE_PIPELINE_FAILED"
             research_retryable = True
+            research_artifact_sha256 = {}
 
     components = (research_status, next_baseline_status)
     status = "READY" if components == ("COMPLETED", "READY") else "PARTIAL"
@@ -466,6 +489,7 @@ def run_research_phase(
                 "reason": research_reason,
                 "reason_code": research_reason_code,
                 "retryable": research_retryable,
+                "artifact_sha256": research_artifact_sha256,
             },
             "next_session_baseline": {
                 "status": next_baseline_status,
@@ -775,6 +799,7 @@ def record_phase_failure(
                     "status": "DATA_NOT_READY",
                     "optimized": False,
                     "reason": safe_reason,
+                    "artifact_sha256": {},
                 },
                 "next_session_baseline": {
                     "status": "DATA_NOT_READY",

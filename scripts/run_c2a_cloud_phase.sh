@@ -20,8 +20,132 @@ cd "$project_root" || {
   exit 2
 }
 project_root="$(pwd -P)"
-failure_recorder="${project_root}/scripts/record_c2a_failure.py"
 trusted_head=""
+
+research_artifacts_publishable() {
+  local report="data/c2a_results/cloud_research_latest.json"
+  [[ -f "$report" && ! -L "$report" ]] || return 1
+  "$python_bin" - "$report" "$trade_day" <<'PY'
+import hashlib
+import hmac
+import json
+import re
+import sys
+from pathlib import Path
+
+expected_artifacts = (
+    "data/c2a_results/baseline_equity.csv",
+    "data/c2a_results/baseline_events.csv",
+    "data/c2a_results/baseline_trades.csv",
+    "data/c2a_results/data_audit.json",
+    "data/c2a_results/latest_signal.json",
+    "data/c2a_results/latest_state.json",
+    "data/c2a_results/latest_training_grid.csv",
+    "data/c2a_results/walk_forward_oos_trades.csv",
+    "data/c2a_results/walk_forward_selections.csv",
+    "reports/c2a_2026_report.md",
+)
+
+
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def is_safe_regular_file(path: Path) -> bool:
+    if path.is_absolute() or ".." in path.parts:
+        return False
+    current = Path()
+    for part in path.parts:
+        current /= part
+        if current.is_symlink():
+            return False
+    return current.is_file()
+
+
+report_path = Path(sys.argv[1])
+if not is_safe_regular_file(report_path):
+    raise SystemExit(1)
+try:
+    payload = json.loads(report_path.read_text(encoding="utf-8"))
+except (OSError, UnicodeError, json.JSONDecodeError):
+    raise SystemExit(1)
+
+if not isinstance(payload, dict):
+    raise SystemExit(1)
+pipeline = payload.get("research_pipeline")
+if (
+    payload.get("phase") != "RESEARCH"
+    or payload.get("as_of") != sys.argv[2]
+    or payload.get("status") != "READY"
+    or payload.get("execution_permission") != "PAPER_ONLY"
+    or payload.get("real_trade_authorized") is not False
+    or payload.get("current_new_entry_allowed") is not False
+    or payload.get("promotion_gate") != "FAIL"
+    or not isinstance(pipeline, dict)
+):
+    raise SystemExit(1)
+reported_hash = payload.get("payload_sha256")
+hash_input = {key: value for key, value in payload.items() if key != "payload_sha256"}
+encoded = json.dumps(
+    hash_input,
+    ensure_ascii=False,
+    sort_keys=True,
+    separators=(",", ":"),
+).encode("utf-8")
+expected_hash = hashlib.sha256(encoded).hexdigest()
+if not isinstance(reported_hash, str) or not hmac.compare_digest(reported_hash, expected_hash):
+    raise SystemExit(1)
+artifact_hashes = pipeline.get("artifact_sha256")
+if (
+    pipeline.get("status") != "COMPLETED"
+    or not isinstance(artifact_hashes, dict)
+    or set(artifact_hashes) != set(expected_artifacts)
+):
+    raise SystemExit(1)
+for relative_path in expected_artifacts:
+    expected = artifact_hashes.get(relative_path)
+    path = Path(relative_path)
+    if (
+        not isinstance(expected, str)
+        or not re.fullmatch(r"[0-9a-f]{64}", expected)
+        or not is_safe_regular_file(path)
+        or not hmac.compare_digest(sha256_file(path), expected)
+    ):
+        raise SystemExit(1)
+raise SystemExit(0)
+PY
+}
+
+research_report_requires_artifacts() {
+  local report="data/c2a_results/cloud_research_latest.json"
+  if [[ -L "$report" || ! -f "$report" ]]; then
+    return 0
+  fi
+  "$python_bin" - "$report" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+try:
+    payload = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+except (OSError, UnicodeError, json.JSONDecodeError):
+    raise SystemExit(0)
+if not isinstance(payload, dict):
+    raise SystemExit(0)
+pipeline = payload.get("research_pipeline")
+raise SystemExit(
+    0
+    if payload.get("status") == "READY"
+    and isinstance(pipeline, dict)
+    and pipeline.get("status") == "COMPLETED"
+    else 1
+)
+PY
+}
 
 phase_paths() {
   paths=(
@@ -36,7 +160,7 @@ phase_paths() {
       "data/c2a_results/fast_latest.json"
       "data/c2a_results/intraday/${trade_day}.json"
     )
-  elif [[ "$phase" == "research" ]]; then
+  elif [[ "$phase" == "research" ]] && research_artifacts_publishable; then
     paths+=(
       "data/c2a_results/baseline_equity.csv"
       "data/c2a_results/baseline_events.csv"
@@ -45,7 +169,6 @@ phase_paths() {
       "data/c2a_results/latest_signal.json"
       "data/c2a_results/latest_state.json"
       "data/c2a_results/latest_training_grid.csv"
-      "data/c2a_results/short_window_analysis.json"
       "data/c2a_results/walk_forward_oos_trades.csv"
       "data/c2a_results/walk_forward_selections.csv"
       "reports/c2a_2026_report.md"
@@ -73,6 +196,10 @@ stage_phase_results() {
   staged_paths=()
   local path
   for path in "${paths[@]}"; do
+    if [[ -L "$path" ]]; then
+      echo "拒绝暂存符号链接阶段产物: $path" >&2
+      return 1
+    fi
     if [[ -e "$path" ]] || git ls-files --error-unmatch -- "$path" >/dev/null 2>&1; then
       git add -- "$path" || return 1
       staged_paths+=("$path")
@@ -170,7 +297,7 @@ publish_failure_outbox() {
     trap 'rm -rf -- "$outbox_root"' EXIT
     git_network clone --quiet --depth 1 --branch main "$origin_url" "$outbox_repo" || exit 1
     command -v python3 >/dev/null 2>&1 || exit 1
-    python3 "$failure_recorder" \
+    python3 "${outbox_repo}/scripts/record_c2a_failure.py" \
       --project-root "$outbox_repo" --phase "$phase" --date "$trade_day" --reason "$reason" \
       || exit 1
     cd "$outbox_repo" || exit 1
@@ -243,6 +370,13 @@ PYTHONPATH=src "$python_bin" -m robot_quant.c2a_cloud \
   "$phase" --project-root . --service-mode || phase_exit=$?
 if [[ "$phase_exit" -ne 0 && "$phase_exit" -ne 75 ]]; then
   fail_phase "C2-A 阶段进程异常退出" 1
+fi
+
+if [[ "$phase" == "research" ]] && research_report_requires_artifacts && \
+  ! research_artifacts_publishable; then
+  record_failure "研究产物发布校验失败" || exit 1
+  publish_phase_results || exit 1
+  exit 75
 fi
 
 publish_phase_results || exit 1

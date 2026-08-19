@@ -21,6 +21,22 @@ from robot_quant.c2a_cloud import (
 SHANGHAI = ZoneInfo("Asia/Shanghai")
 
 
+def _research_artifact_hashes() -> dict[str, str]:
+    paths = (
+        "data/c2a_results/baseline_equity.csv",
+        "data/c2a_results/baseline_events.csv",
+        "data/c2a_results/baseline_trades.csv",
+        "data/c2a_results/data_audit.json",
+        "data/c2a_results/latest_signal.json",
+        "data/c2a_results/latest_state.json",
+        "data/c2a_results/latest_training_grid.csv",
+        "data/c2a_results/walk_forward_oos_trades.csv",
+        "data/c2a_results/walk_forward_selections.csv",
+        "reports/c2a_2026_report.md",
+    )
+    return {path: hashlib.sha256(path.encode("utf-8")).hexdigest() for path in paths}
+
+
 def _scan_result() -> dict:
     return {
         "as_of": "2026-08-19",
@@ -311,10 +327,11 @@ def test_research_runs_after_close_without_delaying_review(tmp_path, monkeypatch
         [{"ticker": "600000", "price": 12.0, "quote_time": "20260819153001"}]
     ).set_index("ticker")
     calls = []
+    artifact_hashes = _research_artifact_hashes()
     monkeypatch.setattr("robot_quant.c2a_cloud.fetch_quotes_fast", lambda tickers: quotes)
     monkeypatch.setattr(
         "robot_quant.c2a_cloud.run_remote_pipeline",
-        lambda *args, **kwargs: calls.append("pipeline"),
+        lambda *args, **kwargs: calls.append("pipeline") or artifact_hashes,
     )
     monkeypatch.setattr(
         "robot_quant.c2a_cloud._ensure_local_fast_pack",
@@ -352,9 +369,58 @@ def test_research_runs_after_close_without_delaying_review(tmp_path, monkeypatch
 
     assert result["status"] == "READY"
     assert result["research_pipeline"]["status"] == "COMPLETED"
+    assert result["research_pipeline"]["artifact_sha256"] == artifact_hashes
     assert result["next_session_baseline"]["baseline_as_of"] == "2026-08-19"
     assert calls == ["ensure", "prepare", "push", "pipeline"]
     assert (tmp_path / "reports/c2a_research_latest.md").exists()
+    written = json.loads(
+        (tmp_path / "data/c2a_results/cloud_research_latest.json").read_text(encoding="utf-8")
+    )
+    reported_hash = written.pop("payload_sha256")
+    encoded = json.dumps(
+        written,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    assert reported_hash == hashlib.sha256(encoded).hexdigest()
+
+
+def test_research_rejects_incomplete_artifact_hash_mapping(tmp_path, monkeypatch) -> None:
+    quotes = pd.DataFrame(
+        [{"ticker": "600000", "price": 12.0, "quote_time": "20260819153001"}]
+    ).set_index("ticker")
+    artifact_hashes = _research_artifact_hashes()
+    artifact_hashes.pop("data/c2a_results/baseline_trades.csv")
+    monkeypatch.setattr("robot_quant.c2a_cloud.fetch_quotes_fast", lambda tickers: quotes)
+    monkeypatch.setattr(
+        "robot_quant.c2a_cloud._ensure_local_fast_pack", lambda *args, **kwargs: None
+    )
+    monkeypatch.setattr(
+        "robot_quant.c2a_cloud.prepare_fast_pack",
+        lambda *args, **kwargs: {
+            "last_processed_date": "2026-08-19",
+            "updated_days": 1,
+            "coverage": 1.0,
+        },
+    )
+    monkeypatch.setattr("robot_quant.c2a_cloud.push_remote_fast_pack", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        "robot_quant.c2a_cloud.run_remote_pipeline",
+        lambda *args, **kwargs: artifact_hashes,
+    )
+
+    result = run_research_phase(
+        tmp_path,
+        now=datetime(2026, 8, 19, 16, 35, tzinfo=SHANGHAI),
+        optimize=False,
+    )
+
+    assert result["status"] == "PARTIAL"
+    assert result["research_pipeline"]["status"] == "DATA_NOT_READY"
+    assert result["research_pipeline"]["reason_code"] == "REMOTE_PIPELINE_FAILED"
+    assert result["research_pipeline"]["artifact_sha256"] == {}
+    assert result["research_pipeline"]["retryable"] is True
 
 
 def test_research_failure_does_not_replace_newer_fast_baseline(tmp_path, monkeypatch) -> None:
@@ -406,6 +472,7 @@ def test_research_failure_does_not_replace_newer_fast_baseline(tmp_path, monkeyp
     assert result["status"] == "PARTIAL"
     assert result["research_pipeline"]["status"] == "DATA_NOT_READY"
     assert result["research_pipeline"]["reason_code"] == "REMOTE_PIPELINE_FAILED"
+    assert result["research_pipeline"]["artifact_sha256"] == {}
     assert result["research_pipeline"]["retryable"] is True
     assert result["next_session_baseline"]["status"] == "READY"
     assert result["next_session_baseline"]["baseline_as_of"] == "2026-08-19"
@@ -454,12 +521,100 @@ def test_research_entitlement_denial_is_partial_and_not_retryable(tmp_path, monk
     assert result["status"] == "PARTIAL"
     assert result["research_pipeline"]["status"] == "DATA_NOT_READY"
     assert result["research_pipeline"]["reason_code"] == "BIGQUANT_ENTITLEMENT_DENIED"
+    assert result["research_pipeline"]["artifact_sha256"] == {}
     assert result["research_pipeline"]["retryable"] is False
     assert result["next_session_baseline"]["status"] == "READY"
     assert result["next_session_baseline"]["baseline_as_of"] == "2026-08-19"
     assert result["next_session_baseline"]["data_status"] == "PROXY"
     assert result["retryable"] is False
     assert calls == ["ensure", "prepare", "push"]
+
+
+def test_research_preserves_baseline_newer_than_requested_day(tmp_path, monkeypatch) -> None:
+    quotes = pd.DataFrame(
+        [{"ticker": "600000", "price": 12.0, "quote_time": "20260819153001"}]
+    ).set_index("ticker")
+    calls = []
+    monkeypatch.setenv("C2A_BIGQUANT_RESEARCH_ENTITLED", "0")
+    monkeypatch.setattr("robot_quant.c2a_cloud.fetch_quotes_fast", lambda tickers: quotes)
+    monkeypatch.setattr(
+        "robot_quant.c2a_cloud._ensure_local_fast_pack",
+        lambda *args, **kwargs: calls.append("ensure"),
+    )
+    monkeypatch.setattr(
+        "robot_quant.c2a_cloud.prepare_fast_pack",
+        lambda *args, **kwargs: (
+            calls.append(("prepare", kwargs))
+            or {
+                "last_processed_date": "2026-08-20",
+                "updated_days": 0,
+                "coverage": 1.0,
+            }
+        ),
+    )
+    monkeypatch.setattr(
+        "robot_quant.c2a_cloud.push_remote_fast_pack",
+        lambda *args, **kwargs: calls.append("push"),
+    )
+
+    result = run_research_phase(
+        tmp_path,
+        now=datetime(2026, 8, 19, 16, 35, tzinfo=SHANGHAI),
+        optimize=False,
+    )
+
+    assert result["status"] == "PARTIAL"
+    assert result["next_session_baseline"] == {
+        "status": "READY",
+        "baseline_as_of": "2026-08-20",
+        "reason": None,
+        "data_status": "PROXY",
+    }
+    assert result["retryable"] is False
+    assert calls[0] == "ensure"
+    assert calls[1][0] == "prepare"
+    assert calls[1][1]["through"].isoformat() == "2026-08-19"
+    assert calls[1][1]["host"] == "bigquant-aistudio"
+    assert calls[1][1]["remote_root"] == "/home/aiuser/work/robot-quant"
+    assert calls[2] == "push"
+
+
+def test_research_rejects_low_coverage_before_remote_push(tmp_path, monkeypatch) -> None:
+    quotes = pd.DataFrame(
+        [{"ticker": "600000", "price": 12.0, "quote_time": "20260819153001"}]
+    ).set_index("ticker")
+    calls = []
+    monkeypatch.setenv("C2A_BIGQUANT_RESEARCH_ENTITLED", "0")
+    monkeypatch.setattr("robot_quant.c2a_cloud.fetch_quotes_fast", lambda tickers: quotes)
+    monkeypatch.setattr(
+        "robot_quant.c2a_cloud._ensure_local_fast_pack",
+        lambda *args, **kwargs: calls.append("ensure"),
+    )
+    monkeypatch.setattr(
+        "robot_quant.c2a_cloud.prepare_fast_pack",
+        lambda *args, **kwargs: {
+            "last_processed_date": "2026-08-19",
+            "updated_days": 1,
+            "coverage": 0.98,
+        },
+    )
+    monkeypatch.setattr(
+        "robot_quant.c2a_cloud.push_remote_fast_pack",
+        lambda *args, **kwargs: calls.append("push"),
+    )
+
+    result = run_research_phase(
+        tmp_path,
+        now=datetime(2026, 8, 19, 16, 35, tzinfo=SHANGHAI),
+        optimize=False,
+    )
+
+    assert result["status"] == "DATA_NOT_READY"
+    assert result["next_session_baseline"]["status"] == "DATA_NOT_READY"
+    assert "覆盖不足" in result["next_session_baseline"]["reason"]
+    assert result["research_pipeline"]["reason_code"] == "BIGQUANT_ENTITLEMENT_DENIED"
+    assert result["retryable"] is True
+    assert calls == ["ensure"]
 
 
 def test_research_fails_closed_on_non_closing_market_snapshot(tmp_path, monkeypatch) -> None:
@@ -481,6 +636,7 @@ def test_research_fails_closed_on_non_closing_market_snapshot(tmp_path, monkeypa
 
     assert result["status"] == "DATA_NOT_READY"
     assert "日期不是2026-08-19" in result["market_close_check"]["reason"]
+    assert result["research_pipeline"]["artifact_sha256"] == {}
     assert calls == []
 
 
