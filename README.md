@@ -21,6 +21,10 @@
 - [下载产业链个股账户历史](data/robot_chain_history.csv)
 - [查看产业链个股机器状态](data/robot_chain_latest_state.json)
 - [查看产业链个股建仓与风控口径](research/robot-industry-chain-paper-model-2026-08-06.md)
+- [查看 C2-A 盘前状态](reports/c2a_prepare_latest.md)
+- [查看 C2-A 10:03 模拟扫描](reports/c2a_scan_latest.md)
+- [查看 C2-A 16:30 盘后复盘](reports/c2a_review_latest.md)
+- [查看 C2-A 16:35 盘后研究](reports/c2a_research_latest.md)
 
 ![质量门控定投与固定定投累计市值](reports/performance.png)
 
@@ -88,6 +92,81 @@ python -m pytest
 robot-quant run-daily
 robot-quant run-robot-chain-paper
 ```
+
+## C2-A 早盘异常强势模型
+
+C2-A 与机器人ETF模型相互独立，只做纸面研究。它需要全A股逐分钟横截面，不能用日线、5分钟K线、涨幅榜前N名或少量候选股票替代。当前实现同时保留原始 `v1` 与动态完整分钟快照 `v1.2`：
+
+当前自动日更使用 `v1.2-challenger` 纸面挑战者：扫描截止10:00、C6阈值40、主板/成长板首仓回撤2.5%/3.5%、二次增量0.5%，并排除昨日涨停股。它来自2026-07-01至2026-08-11的回顾性短窗筛选，滚动样本外仍未通过，真实交易权限固定为0。
+
+- 过去20个交易日同一完整分钟累计额/量基线严格先移位一天再滚动，避免当前日或未来日进入基线；
+- 统一规范化为成交量=股、成交额=元、流通股本=股；BigQuant 原生字段按数据表定义读取，备用 Tushare 路径会把 `daily.amount` 从千元乘1000、`daily_basic.float_share` 从万股乘10000，`stk_mins` 原生即为股/元；
+- `09:25` 集合竞价单独排除；连续竞价1分钟结束时标严格按09:31–11:30、13:01–15:00，每日240根，审计每个时标而非只数行数；
+- 主板和成长板分别计算 c6 百分位；
+- 入场只使用上一完整分钟滚动高点，支持首仓、同股深回撤及候补股竞争；
+- 模拟整手、单分钟5%容量、佣金、最低佣金、印花税、过户费、滑点与一字跌停锁定；
+- 价格笼子以“上一完整分钟收盘价”作保守代理，因此即使输入数据为 `STRICT`，成交保真度仍标记为 `MINUTE_BAR_PROXY`；
+- 参数用扩展训练窗、1交易日隔离带和不重叠测试窗评估；所有 OOS 折共用一个连续账户，不在折边界清空 T+1 持仓或20日冷却状态；
+- 原始全市场分钟分区按日流式生成研究缓存，回测按分区直接构造共享对象，不再先拼接全年大表；720组参数的扩展训练路径只计算一次，各折复用历史前缀；
+- BigQuant 主路径按交易日日分区下载并逐股校验完整分钟时标；备用 Tushare 路径采用“原始切片→待合并断点→日分区→提交进度”的两阶段流程，空响应不会吞掉预期交易日；Universe 原始日快照同样可断点复用；
+- 基准交易、净值和信号/未成交/跌停延迟事件分别保存为 `baseline_trades.csv`、`baseline_equity.csv` 和 `baseline_events.csv`；
+- 数据仓为空时标记 `DATA_NOT_READY`；有数据但任一门槛缺失时保持 `PROXY / PAPER_ONLY`。`STRICT` 只表示输入数据审计通过，不代表逐笔成交可验证，也不会生成实盘权限。
+
+本地数据仓默认位于 `data/c2a/`。低成本主路径为 BigQuant；Tushare 仅作备用。程序会自动向前多取45个自然日，为2026年1月初信号准备20个交易日基线。
+
+BigQuant 主路径通过 SSH 在 AIStudio 内运行，因为当前账号的本地 SDK 查询权限未开放。SSH 使用独立密钥和别名 `bigquant-aistudio`，私钥只保留在本机；PyCharm 只同步 `src/robot_quant` 中的 C2-A 代码，不上传凭证、Git 元数据、本地行情或其他项目文件。全市场每个股票日仍先校验完整240根分钟网格，但远端磁盘只保存滚动基线、候选特征和回测所需压缩行，避免全年原始分钟CSV超出工作空间容量。
+
+10:03盘中扫描不等待BigQuant当日盘后分区。`c2a_intraday.py`复用截至上一交易日的BigQuant Universe与20日滚动同分钟基线，腾讯累计分钟负责09:31–10:00全池量额与收盘快照，东方财富只为初筛候选补充分钟OHLC。适配器会扣除09:30集合竞价累计基点、把腾讯手数换算为股，并单独审计30根已完成分钟；跨源结果固定标记为`PROXY / PAPER_ONLY`，不得称为`STRICT`。基线不足股票不补零，覆盖率低于99%或任一参与排名股票分钟不完整时直接`DATA_NOT_READY`。
+
+本地 `.venv-bigquant` 与 `~/.bigquant/config.json` 仅保留为以后获得 SDK 权限后的备用通道；它们不是当前自动更新链路的依赖。
+
+```bash
+# 没有数据时也可以运行，输出缺项清单
+robot-quant c2a-audit --start 2026-01-01 --variant v1.2
+
+# 检查 AIStudio SSH 与远端 BigQuant 环境
+ssh bigquant-aistudio "python -m pip show bigquant"
+
+# 从 PyCharm/本地触发远端增量数据更新
+.venv/bin/python -m robot_quant.c2a_remote update --project-root . --start 2026-01-01
+
+# 远端运行数据审计并把报告拉回本地项目
+.venv/bin/python -m robot_quant.c2a_remote audit --project-root . --start 2026-01-01
+
+# 一键更新、720组走样本外优化并拉回报告
+.venv/bin/python -m robot_quant.c2a_remote run --project-root . --start 2026-01-01
+
+# 10:03盘中PROXY扫描（在bigquant-aistudio项目目录执行）
+PYTHONPATH=src python -m robot_quant.c2a_intraday \
+  --project-root . --date 2026-08-14 --cutoff 10:00 \
+  --output data/c2a_results/intraday_latest.json
+
+# 一次性/每日盘前准备本地快速基线；慢任务不会进入盘中扫描路径
+.venv/bin/python main.py --prepare
+
+# 开盘后手动快速扫描；自动使用上一根完整分钟，只输出模拟入场和观察代码/名称
+.venv/bin/python main.py
+
+# 备用 Tushare 路径（需要相应积分权限）
+robot-quant c2a-configure-tushare
+robot-quant c2a-update-tushare --start 2026-01-01
+
+# 可单独预生成分区研究缓存；回测命令也会自动执行
+robot-quant c2a-build-cache --start 2026-01-01 --variant v1.2
+
+# STRICT 数据才会默认运行；降级研究必须显式添加 --allow-proxy
+robot-quant c2a-backtest --start 2026-01-01 --variant v1.2
+```
+
+快速入口把慢速准备与盘中计算分开：前一交易日15:05后运行一次`--prepare`，开盘后
+直接运行`main.py`。本地基线不是上一交易日时，盘中入口会立即返回`DATA_NOT_READY`，
+不会临时启动SSH、BigQuant或慢速历史补数。2026-08-18本机实测09:34/10:00窗口约
+14.7～16.9秒，实际耗时会随公共行情网络波动。终端中的`ENTRY`始终是纸面模拟成交，
+`WATCHLIST`只是尚未通过回撤入场门槛的观察项；两者均不连接券商。
+
+本地 PyCharm 可用于开发和手工核验，但长驻进程不作为云端主调度器。生产化入口是 `python -m robot_quant.c2a_cloud prepare|scan|review|research`：持续在线 Linux 主机在工作日08:45准备基线、10:02:30启动扫描并目标在10:03前发布、16:30快速核对当天早盘信号、16:35再启动研究流水线并更新下一交易日基线。扫描若超过信号有效期会如实标记 `LATE`；各盘后阶段均先验证当日15:00后的行情；休市或行情陈旧时只写 `DATA_NOT_READY`。GitHub Actions 定时任务可能严重排队，因此只负责既有收盘日报和手工补跑，不承担 C2-A 的准点主时钟。完整安全边界、systemd 单元和上线验收见 [C2-A 云端部署说明](docs/c2a-cloud-deployment.md)。
+
+C2-A 云端产物按日期保存。任何阶段失败都会覆盖 `latest` 为当日 `DATA_NOT_READY` 空候选，不会回忆或沿用昨日信号；`data/c2a/`、`data/c2a_fast/`、参数 pickle、SSH 私钥及 API 凭证均禁止提交到 GitHub。
 
 ## 风险说明
 

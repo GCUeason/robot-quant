@@ -10,10 +10,11 @@ readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
   "matplotlib>=3.9,<4",
-  "numpy>=2.0,<3",
+  "numpy>=1.26,<3",
   "pandas>=2.2,<3",
   "requests>=2.32,<3",
   "scikit-learn>=1.5,<2",
+  "tabulate>=0.9,<1",
 ]
 
 [project.optional-dependencies]
@@ -24,6 +25,7 @@ dev = [
 
 [project.scripts]
 robot-quant = "robot_quant.cli:main"
+c2a-fast = "robot_quant.c2a_fast:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

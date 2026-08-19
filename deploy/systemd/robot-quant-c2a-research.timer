@@ -1,0 +1,12 @@
+[Unit]
+Description=Refresh C2-A research results and next-session baseline after close
+
+[Timer]
+OnCalendar=Mon..Fri *-*-* 16:35:00 Asia/Shanghai
+AccuracySec=1s
+RandomizedDelaySec=0
+Persistent=true
+Unit=robot-quant-c2a@research.service
+
+[Install]
+WantedBy=timers.target

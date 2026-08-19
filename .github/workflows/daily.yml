@@ -10,7 +10,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: daily-robot-quant
+  group: robot-quant-repository-writer
   cancel-in-progress: false
 
 jobs:
@@ -19,12 +19,13 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Check out repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: "3.12"
           cache: pip
@@ -41,13 +42,39 @@ jobs:
         run: robot-quant run-daily
 
       - name: Commit changed results
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/ reports/
+          git add \
+            data/latest_state.json \
+            data/portfolio_history.csv \
+            data/robot_chain_history.csv \
+            data/robot_chain_latest_state.json \
+            reports/latest.md \
+            reports/performance.png \
+            reports/robot_chain_latest.md \
+            reports/robot_chain_performance.png
           if git diff --cached --quiet; then
             echo "No market-data changes."
             exit 0
           fi
           git commit -m "chore: update daily simulation"
-          git push
+          git config --local credential.helper \
+            '!f() { echo username=x-access-token; echo "password=$GITHUB_TOKEN"; }; f'
+          trap 'git config --local --unset-all credential.helper || true' EXIT
+          for attempt in 1 2 3; do
+            if git push origin HEAD:main; then
+              exit 0
+            fi
+            if ! git fetch origin main; then
+              continue
+            fi
+            if ! git rebase origin/main; then
+              git rebase --abort || true
+              exit 1
+            fi
+          done
+          echo "Push failed after three attempts." >&2
+          exit 1

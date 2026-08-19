@@ -1,0 +1,12 @@
+[Unit]
+Description=Prepare C2-A rolling baseline before the A-share session
+
+[Timer]
+OnCalendar=Mon..Fri *-*-* 08:45:00 Asia/Shanghai
+AccuracySec=1s
+RandomizedDelaySec=0
+Persistent=true
+Unit=robot-quant-c2a@prepare.service
+
+[Install]
+WantedBy=timers.target

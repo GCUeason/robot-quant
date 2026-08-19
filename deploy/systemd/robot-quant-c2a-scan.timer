@@ -1,0 +1,12 @@
+[Unit]
+Description=Start the C2-A paper-only scan early enough to publish by 10:03
+
+[Timer]
+OnCalendar=Mon..Fri *-*-* 10:02:30 Asia/Shanghai
+AccuracySec=1s
+RandomizedDelaySec=0
+Persistent=true
+Unit=robot-quant-c2a@scan.service
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,24 @@
+[Unit]
+Description=Robot Quant C2-A cloud phase (%i)
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=30min
+StartLimitBurst=3
+
+[Service]
+Type=oneshot
+User=robotquant
+Group=robotquant
+WorkingDirectory=/srv/robot-quant
+Environment=PYTHONUNBUFFERED=1
+EnvironmentFile=-/etc/robot-quant/c2a.env
+ExecStart=/srv/robot-quant/scripts/run_c2a_cloud_phase.sh %i
+TimeoutStartSec=4h
+TimeoutStopSec=2min
+Restart=on-failure
+RestartSec=2min
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
