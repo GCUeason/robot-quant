@@ -118,6 +118,7 @@ def test_systemd_timers_use_shanghai_wall_clock_without_random_delay() -> None:
     service = (ROOT / "deploy/systemd/robot-quant-c2a@.service").read_text(encoding="utf-8")
     assert "Restart=on-failure" in service
     assert "StartLimitBurst=3" in service
+    assert "InaccessiblePaths=/usr/local/etc/xray" in service
 
 
 def test_dependency_free_failure_recorder_clears_stale_scan(tmp_path) -> None:

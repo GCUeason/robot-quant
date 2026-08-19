@@ -19,6 +19,7 @@ Restart=on-failure
 RestartSec=2min
 NoNewPrivileges=true
 PrivateTmp=true
+InaccessiblePaths=/usr/local/etc/xray
 
 [Install]
 WantedBy=multi-user.target
