@@ -405,13 +405,61 @@ def test_research_failure_does_not_replace_newer_fast_baseline(tmp_path, monkeyp
 
     assert result["status"] == "PARTIAL"
     assert result["research_pipeline"]["status"] == "DATA_NOT_READY"
-    assert result["next_session_baseline"] == {
-        "status": "READY",
-        "baseline_as_of": "2026-08-19",
-        "reason": None,
-    }
+    assert result["research_pipeline"]["reason_code"] == "REMOTE_PIPELINE_FAILED"
+    assert result["research_pipeline"]["retryable"] is True
+    assert result["next_session_baseline"]["status"] == "READY"
+    assert result["next_session_baseline"]["baseline_as_of"] == "2026-08-19"
+    assert result["next_session_baseline"]["data_status"] == "PROXY"
     assert result["retryable"] is True
     assert calls == ["ensure", "prepare", "push", "pipeline"]
+
+
+def test_research_entitlement_denial_is_partial_and_not_retryable(tmp_path, monkeypatch) -> None:
+    quotes = pd.DataFrame(
+        [{"ticker": "600000", "price": 12.0, "quote_time": "20260819153001"}]
+    ).set_index("ticker")
+    calls = []
+    monkeypatch.setenv("C2A_BIGQUANT_RESEARCH_ENTITLED", "0")
+    monkeypatch.setattr("robot_quant.c2a_cloud.fetch_quotes_fast", lambda tickers: quotes)
+    monkeypatch.setattr(
+        "robot_quant.c2a_cloud._ensure_local_fast_pack",
+        lambda *args, **kwargs: calls.append("ensure"),
+    )
+    monkeypatch.setattr(
+        "robot_quant.c2a_cloud.prepare_fast_pack",
+        lambda *args, **kwargs: (
+            calls.append("prepare")
+            or {
+                "last_processed_date": "2026-08-19",
+                "updated_days": 1,
+                "coverage": 1.0,
+            }
+        ),
+    )
+    monkeypatch.setattr(
+        "robot_quant.c2a_cloud.push_remote_fast_pack",
+        lambda *args, **kwargs: calls.append("push"),
+    )
+    monkeypatch.setattr(
+        "robot_quant.c2a_cloud.run_remote_pipeline",
+        lambda *args, **kwargs: pytest.fail("确定性权限不足时不得重复调用远端研究"),
+    )
+
+    result = run_research_phase(
+        tmp_path,
+        now=datetime(2026, 8, 19, 16, 35, tzinfo=SHANGHAI),
+        optimize=False,
+    )
+
+    assert result["status"] == "PARTIAL"
+    assert result["research_pipeline"]["status"] == "DATA_NOT_READY"
+    assert result["research_pipeline"]["reason_code"] == "BIGQUANT_ENTITLEMENT_DENIED"
+    assert result["research_pipeline"]["retryable"] is False
+    assert result["next_session_baseline"]["status"] == "READY"
+    assert result["next_session_baseline"]["baseline_as_of"] == "2026-08-19"
+    assert result["next_session_baseline"]["data_status"] == "PROXY"
+    assert result["retryable"] is False
+    assert calls == ["ensure", "prepare", "push"]
 
 
 def test_research_fails_closed_on_non_closing_market_snapshot(tmp_path, monkeypatch) -> None:

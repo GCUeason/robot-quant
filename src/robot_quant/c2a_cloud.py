@@ -52,6 +52,7 @@ PHASE_SCHEDULES = {
     "review": time(16, 30),
     "research": time(16, 35),
 }
+TRUTHY_ENV_VALUES = {"1", "true", "yes", "on"}
 
 
 def _write_json_atomic(payload: dict, path: Path) -> None:
@@ -425,19 +426,31 @@ def run_research_phase(
 
     research_status = "COMPLETED"
     research_reason = None
-    try:
-        run_remote_pipeline(
-            root,
-            (day - timedelta(days=45)).isoformat(),
-            day.isoformat(),
-            optimize=should_optimize,
-            variant="v1.2-challenger",
-            host=host,
-            remote_root=remote_root,
-        )
-    except (RuntimeError, ValueError, OSError) as error:
+    research_reason_code = None
+    research_retryable = False
+    research_entitled = (
+        os.environ.get("C2A_BIGQUANT_RESEARCH_ENTITLED", "1").strip().lower() in TRUTHY_ENV_VALUES
+    )
+    if not research_entitled:
         research_status = "DATA_NOT_READY"
-        research_reason = _safe_error(error)
+        research_reason = "BigQuant cn_stock_bar1m_c 权限未开通；未执行严格研究"
+        research_reason_code = "BIGQUANT_ENTITLEMENT_DENIED"
+    else:
+        try:
+            run_remote_pipeline(
+                root,
+                (day - timedelta(days=45)).isoformat(),
+                day.isoformat(),
+                optimize=should_optimize,
+                variant="v1.2-challenger",
+                host=host,
+                remote_root=remote_root,
+            )
+        except (RuntimeError, ValueError, OSError) as error:
+            research_status = "DATA_NOT_READY"
+            research_reason = _safe_error(error)
+            research_reason_code = "REMOTE_PIPELINE_FAILED"
+            research_retryable = True
 
     components = (research_status, next_baseline_status)
     status = "READY" if components == ("COMPLETED", "READY") else "PARTIAL"
@@ -451,14 +464,17 @@ def run_research_phase(
                 "status": research_status,
                 "optimized": should_optimize,
                 "reason": research_reason,
+                "reason_code": research_reason_code,
+                "retryable": research_retryable,
             },
             "next_session_baseline": {
                 "status": next_baseline_status,
                 "baseline_as_of": next_baseline_as_of,
                 "reason": next_baseline_reason,
+                "data_status": ("PROXY" if next_baseline_status == "READY" else "DATA_NOT_READY"),
             },
             "promotion_gate": "FAIL",
-            "retryable": status != "READY",
+            "retryable": next_baseline_status != "READY" or research_retryable,
         }
     )
     markdown = _research_markdown(payload)
@@ -672,8 +688,8 @@ def _research_markdown(payload: dict) -> str:
 - 日期：{payload["as_of"]}
 - 总体状态：**{payload["status"]}**
 - 收盘校验：**{market["status"]}**；{market.get("quote_time") or market.get("reason") or "缺失"}
-- 研究流水线：**{research["status"]}**；{research.get("reason") or "完成"}
-- 下一交易日基线：**{baseline["status"]}**；截止 {baseline.get("baseline_as_of") or "缺失"}
+- 研究流水线：**{research["status"]}**；{research.get("reason_code") or "COMPLETED"}；{research.get("reason") or "完成"}
+- 下一交易日基线：**{baseline["status"]} / {baseline.get("data_status") or "DATA_NOT_READY"}**；截止 {baseline.get("baseline_as_of") or "缺失"}
 - 模型晋级门槛：**FAIL**
 - 权限：**PAPER_ONLY；不连接券商**
 
