@@ -1,0 +1,472 @@
+{
+  "as_of": "2026-08-19",
+  "status": "RECONSTRUCTED_SIMULATED_ENTRY",
+  "signal_status": "SIMULATED_ENTRY",
+  "delivery_timing": "LATE",
+  "requested_at": "2026-08-19T14:32:23.182426+08:00",
+  "data_status": "PROXY",
+  "cutoff": "10:00",
+  "complete_minutes": 30,
+  "generated_at": "2026-08-19T14:32:46.269801+08:00",
+  "signal_valid_until": "2026-08-19T10:03:00+08:00",
+  "elapsed_seconds": 22.650810077786446,
+  "stage_seconds": {
+    "preflight": 0.6427792962640524,
+    "quotes_and_universe": 0.433610450476408,
+    "full_market_minutes": 19.66052983980626,
+    "feature_ranking": 0.28301913011819124,
+    "candidate_ohlc_and_simulation": 1.5882235076278448
+  },
+  "universe_count": 2643,
+  "baseline_coverage": 0.996982270841192,
+  "baseline_as_of": "2026-08-18",
+  "baseline_excluded_tickers": [
+    "000972",
+    "001260",
+    "300908",
+    "301602",
+    "603277",
+    "603382",
+    "603797",
+    "688646"
+  ],
+  "candidate_count": 118,
+  "entry_count": 2,
+  "entries": [
+    {
+      "ticker": "000523",
+      "name": "红棉股份",
+      "entry_time": "2026-08-19T09:33:00",
+      "simulated_fill_price": 3.26,
+      "shares": 1500,
+      "simulated_notional": 4890.0
+    },
+    {
+      "ticker": "002437",
+      "name": "誉衡药业",
+      "entry_time": "2026-08-19T09:36:00",
+      "simulated_fill_price": 4.87,
+      "shares": 800,
+      "simulated_notional": 3896.0
+    }
+  ],
+  "watchlist": [
+    {
+      "ticker": "601886",
+      "name": "江河集团",
+      "scan_price": 13.23,
+      "c6": 0.496453900709215,
+      "gain": 0.03927729772191668,
+      "amount_burst": 19.234228838145334
+    },
+    {
+      "ticker": "601609",
+      "name": "金田股份",
+      "scan_price": 12.68,
+      "c6": 0.6769825918762074,
+      "gain": 0.06108786610878658,
+      "amount_burst": 10.602655669437056
+    },
+    {
+      "ticker": "000523",
+      "name": "红棉股份",
+      "scan_price": 3.19,
+      "c6": 0.702772404900065,
+      "gain": 0.049342105263157965,
+      "amount_burst": 10.379915642936872
+    },
+    {
+      "ticker": "688278",
+      "name": "特宝生物",
+      "scan_price": 65.09,
+      "c6": 0.9706959706959672,
+      "gain": 0.0819481382978724,
+      "amount_burst": 6.980229658454211
+    },
+    {
+      "ticker": "000788",
+      "name": "北大医药",
+      "scan_price": 5.99,
+      "c6": 1.1863313990973623,
+      "gain": 0.04537521815008727,
+      "amount_burst": 8.635248636554902
+    },
+    {
+      "ticker": "002202",
+      "name": "金风科技",
+      "scan_price": 23.41,
+      "c6": 1.3862024500322256,
+      "gain": 0.06360745115856425,
+      "amount_burst": 7.287202341765143
+    },
+    {
+      "ticker": "600721",
+      "name": "百花医药",
+      "scan_price": 14.3,
+      "c6": 1.4958091553836206,
+      "gain": 0.059259259259259345,
+      "amount_burst": 9.648815777455363
+    },
+    {
+      "ticker": "600216",
+      "name": "浙江医药",
+      "scan_price": 14.21,
+      "c6": 1.8891038039974273,
+      "gain": 0.03270348837209314,
+      "amount_burst": 6.7178994624762085
+    },
+    {
+      "ticker": "002346",
+      "name": "柘中股份",
+      "scan_price": 27.35,
+      "c6": 2.301740812379116,
+      "gain": 0.04789272030651337,
+      "amount_burst": 6.066473042265171
+    },
+    {
+      "ticker": "601015",
+      "name": "陕西黑猫",
+      "scan_price": 3.55,
+      "c6": 2.443584784010311,
+      "gain": 0.053412462908011715,
+      "amount_burst": 5.451704895145613
+    },
+    {
+      "ticker": "600121",
+      "name": "郑州煤电",
+      "scan_price": 4.2,
+      "c6": 2.5338491295938015,
+      "gain": 0.07416879795396425,
+      "amount_burst": 5.374828372865202
+    },
+    {
+      "ticker": "688323",
+      "name": "瑞华泰",
+      "scan_price": 32.03,
+      "c6": 2.902930402930415,
+      "gain": 0.056746948201913616,
+      "amount_burst": 4.072820227846559
+    },
+    {
+      "ticker": "600758",
+      "name": "辽宁能源",
+      "scan_price": 3.55,
+      "c6": 2.927143778207608,
+      "gain": 0.05970149253731338,
+      "amount_burst": 4.9418507991620695
+    },
+    {
+      "ticker": "600583",
+      "name": "海油工程",
+      "scan_price": 6.21,
+      "c6": 3.197936814958091,
+      "gain": 0.031561461794020085,
+      "amount_burst": 4.988662784785341
+    },
+    {
+      "ticker": "002043",
+      "name": "兔 宝 宝",
+      "scan_price": 13.0,
+      "c6": 3.675048355899424,
+      "gain": 0.04923325262308298,
+      "amount_burst": 4.104717284953533
+    },
+    {
+      "ticker": "000756",
+      "name": "新华制药",
+      "scan_price": 14.47,
+      "c6": 4.719535783365581,
+      "gain": 0.03505007153075823,
+      "amount_burst": 3.7603297755784237
+    },
+    {
+      "ticker": "600460",
+      "name": "士兰微",
+      "scan_price": 36.03,
+      "c6": 5.3127014829142505,
+      "gain": 0.03297018348623859,
+      "amount_burst": 3.666063107931907
+    },
+    {
+      "ticker": "002508",
+      "name": "老板电器",
+      "scan_price": 16.39,
+      "c6": 5.512572533849125,
+      "gain": 0.04063492063492058,
+      "amount_burst": 3.369730058710293
+    },
+    {
+      "ticker": "000703",
+      "name": "恒逸石化",
+      "scan_price": 18.91,
+      "c6": 7.11798839458414,
+      "gain": 0.08242701774470529,
+      "amount_burst": 3.0023277897238803
+    },
+    {
+      "ticker": "688488",
+      "name": "艾迪药业",
+      "scan_price": 18.3,
+      "c6": 7.591575091575087,
+      "gain": 0.05780346820809257,
+      "amount_burst": 2.569546629302284
+    },
+    {
+      "ticker": "000973",
+      "name": "佛塑科技",
+      "scan_price": 14.21,
+      "c6": 7.994842037395234,
+      "gain": 0.03420669577874813,
+      "amount_burst": 2.8985409616275226
+    },
+    {
+      "ticker": "603657",
+      "name": "春光科技",
+      "scan_price": 28.28,
+      "c6": 8.278529980657645,
+      "gain": 0.0362770245511177,
+      "amount_burst": 2.7256719265523417
+    },
+    {
+      "ticker": "002493",
+      "name": "荣盛石化",
+      "scan_price": 13.43,
+      "c6": 9.806576402321099,
+      "gain": 0.04351204351204352,
+      "amount_burst": 2.383393837336962
+    },
+    {
+      "ticker": "300967",
+      "name": "晓鸣股份",
+      "scan_price": 17.96,
+      "c6": 10.549450549450556,
+      "gain": 0.0639810426540286,
+      "amount_burst": 10.948999898646226
+    },
+    {
+      "ticker": "603556",
+      "name": "海兴电力",
+      "scan_price": 27.75,
+      "c6": 10.657640232108312,
+      "gain": 0.043233082706766846,
+      "amount_burst": 2.32789845704224
+    },
+    {
+      "ticker": "300705",
+      "name": "九典制药",
+      "scan_price": 12.59,
+      "c6": 10.695970695970702,
+      "gain": 0.060657118786857644,
+      "amount_burst": 10.090169703500337
+    },
+    {
+      "ticker": "300035",
+      "name": "中科电气",
+      "scan_price": 14.72,
+      "c6": 10.888278388278394,
+      "gain": 0.08634686346863463,
+      "amount_burst": 8.40520603336402
+    },
+    {
+      "ticker": "301232",
+      "name": "飞沃科技",
+      "scan_price": 119.0,
+      "c6": 11.35531135531136,
+      "gain": 0.030303030303030276,
+      "amount_burst": 8.049676715311746
+    },
+    {
+      "ticker": "300855",
+      "name": "图南股份",
+      "scan_price": 33.66,
+      "c6": 11.373626373626378,
+      "gain": 0.03633004926108363,
+      "amount_burst": 8.371227074640395
+    },
+    {
+      "ticker": "300917",
+      "name": "特发服务",
+      "scan_price": 28.36,
+      "c6": 11.749084249084252,
+      "gain": 0.07587253414264028,
+      "amount_burst": 6.299232572759216
+    },
+    {
+      "ticker": "301005",
+      "name": "超捷股份",
+      "scan_price": 92.56,
+      "c6": 12.335164835164836,
+      "gain": 0.036622242132377636,
+      "amount_burst": 5.925973478315339
+    },
+    {
+      "ticker": "300465",
+      "name": "高伟达",
+      "scan_price": 14.47,
+      "c6": 13.397435897435894,
+      "gain": 0.05929721815519762,
+      "amount_burst": 4.532019099137677
+    },
+    {
+      "ticker": "300311",
+      "name": "任子行",
+      "scan_price": 6.22,
+      "c6": 14.304029304029298,
+      "gain": 0.04013377926421402,
+      "amount_burst": 3.8721523910166136
+    },
+    {
+      "ticker": "603389",
+      "name": "亚振家居",
+      "scan_price": 49.49,
+      "c6": 14.85493230174082,
+      "gain": 0.03211678832116793,
+      "amount_burst": 1.9795120253801115
+    },
+    {
+      "ticker": "000301",
+      "name": "东方盛虹",
+      "scan_price": 13.59,
+      "c6": 15.544809800128956,
+      "gain": 0.04458109146810152,
+      "amount_burst": 1.9393459334549317
+    },
+    {
+      "ticker": "300373",
+      "name": "扬杰科技",
+      "scan_price": 106.66,
+      "c6": 15.613553113553102,
+      "gain": 0.043639921722113506,
+      "amount_burst": 3.507798011747995
+    },
+    {
+      "ticker": "300911",
+      "name": "亿田智能",
+      "scan_price": 24.37,
+      "c6": 15.695970695970685,
+      "gain": 0.09675967596759683,
+      "amount_burst": 3.3852310312804397
+    },
+    {
+      "ticker": "600566",
+      "name": "济川药业",
+      "scan_price": 24.82,
+      "c6": 16.279819471308844,
+      "gain": 0.03373594335693464,
+      "amount_burst": 1.7530721385128787
+    },
+    {
+      "ticker": "603876",
+      "name": "鼎胜新材",
+      "scan_price": 23.53,
+      "c6": 16.447453255963897,
+      "gain": 0.032017543859649056,
+      "amount_burst": 1.9064853345667905
+    },
+    {
+      "ticker": "600346",
+      "name": "恒力石化",
+      "scan_price": 18.69,
+      "c6": 16.96969696969697,
+      "gain": 0.040645879732739365,
+      "amount_burst": 1.8212876296042406
+    },
+    {
+      "ticker": "301085",
+      "name": "亚康股份",
+      "scan_price": 67.21,
+      "c6": 19.32234432234432,
+      "gain": 0.05097732603596539,
+      "amount_burst": 2.5046366032893124
+    },
+    {
+      "ticker": "600547",
+      "name": "山东黄金",
+      "scan_price": 31.66,
+      "c6": 24.397163120567377,
+      "gain": 0.03430251551780472,
+      "amount_burst": 1.384182085633707
+    },
+    {
+      "ticker": "300483",
+      "name": "首华燃气",
+      "scan_price": 24.16,
+      "c6": 30.073260073260077,
+      "gain": 0.03913978494623649,
+      "amount_burst": 1.6116647423684012
+    },
+    {
+      "ticker": "301520",
+      "name": "万邦医药",
+      "scan_price": 79.88,
+      "c6": 30.924908424908427,
+      "gain": 0.08150555104251289,
+      "amount_burst": 1.6577286508081948
+    },
+    {
+      "ticker": "300534",
+      "name": "陇神戎发",
+      "scan_price": 20.17,
+      "c6": 33.37912087912087,
+      "gain": 0.04237726098191219,
+      "amount_burst": 1.5529886875415733
+    }
+  ],
+  "remaining_cash": 1203.9121400000004,
+  "parameters": {
+    "variant": "v1.2",
+    "scan_end": "10:00",
+    "entry_cutoff": "14:57",
+    "c6_threshold": 40.0,
+    "amount_weight": 0.5,
+    "turnover_weight": 0.3,
+    "gain_weight": 0.2,
+    "main_gain_min": 0.03,
+    "main_gain_max": 0.095,
+    "growth_gain_min": 0.03,
+    "growth_gain_max": 0.19,
+    "main_first_pullback": 0.025,
+    "growth_first_pullback": 0.035,
+    "main_second_increment": 0.005,
+    "growth_second_increment": 0.005,
+    "main_alt_increment": 0.005,
+    "growth_alt_increment": 0.005,
+    "first_weight": 0.6,
+    "second_weight": 0.4,
+    "baseline_days": 20,
+    "confirmation_minutes": 2,
+    "signal_expiry_minutes": 3,
+    "reset_c6": 35.0,
+    "reset_minutes": 2,
+    "use_relative_turnover": true,
+    "max_overshoot_main": 0.01,
+    "max_overshoot_growth": 0.015,
+    "allow_same_stock_second": false,
+    "daily_exposure_cap": 10000.0,
+    "single_stock_cap": 5000.0,
+    "max_positions": 2,
+    "max_participation": 0.05,
+    "cooldown_days": 20,
+    "commission_rate": 0.0003,
+    "minimum_commission": 5.0,
+    "stamp_tax_sell": 0.0005,
+    "transfer_fee_rate": 1e-05,
+    "slippage_bps": 5.0,
+    "price_tick": 0.01,
+    "exclude_yesterday_limit_up": true,
+    "max_allowed_limit_streak": 1
+  },
+  "promotion_gate": "FAIL",
+  "execution_permission": "PAPER_ONLY",
+  "real_trade_authorized": false,
+  "current_new_entry_allowed": false,
+  "event_count": 54,
+  "phase": "SCAN",
+  "retryable": false,
+  "scheduled_at": "2026-08-19T10:02:30+08:00",
+  "started_at": "2026-08-19T14:32:23.182426+08:00",
+  "source_commit": "769dfebe67d884e7442cc5fbdcd444c379bcdb2f",
+  "source_manifest_sha256": "3178515b20407dc65e6678c3d5c1dc3308c7e5a31e4d751ffed2445b448596aa",
+  "finished_at": "2026-08-19T14:32:46.298607+08:00",
+  "payload_sha256": "a20eb5e3f388ede106fbc66d658cf4fe430453b98cb2101f651a01dec4840c44"
+}
