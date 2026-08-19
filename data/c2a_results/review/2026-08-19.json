@@ -1,0 +1,60 @@
+{
+  "phase": "REVIEW",
+  "as_of": "2026-08-19",
+  "generated_at": "2026-08-19T15:00:45.553678+08:00",
+  "scheduled_at": "2026-08-19T16:30:00+08:00",
+  "started_at": "2026-08-19T15:00:45.553678+08:00",
+  "execution_permission": "PAPER_ONLY",
+  "real_trade_authorized": false,
+  "current_new_entry_allowed": false,
+  "retryable": false,
+  "status": "RECONSTRUCTED_REVIEW",
+  "review_mode": "RECONSTRUCTED",
+  "source_scan_status": "RECONSTRUCTED_SIMULATED_ENTRY",
+  "source_delivery_timing": "LATE",
+  "market_close_check": {
+    "status": "READY",
+    "benchmark": "600000",
+    "quote_time": "20260819150042",
+    "reason": null
+  },
+  "morning_signal": {
+    "status": "COMPLETED",
+    "reason": null,
+    "scan_status": "RECONSTRUCTED_SIMULATED_ENTRY",
+    "signal_status": "SIMULATED_ENTRY",
+    "entries": [
+      {
+        "ticker": "000523",
+        "name": "红棉股份",
+        "entry_time": "2026-08-19T09:33:00",
+        "simulated_fill_price": 3.26,
+        "shares": 1500,
+        "simulated_notional": 4890.0,
+        "close_price": 3.21,
+        "quote_time": "20260819150031",
+        "gross_mark_to_close_return": -0.015337423312883347,
+        "gross_mark_to_close_pnl": -74.99999999999973,
+        "exit_status": "NEXT_TRADING_DAY_OPEN_PENDING"
+      },
+      {
+        "ticker": "002437",
+        "name": "誉衡药业",
+        "entry_time": "2026-08-19T09:36:00",
+        "simulated_fill_price": 4.87,
+        "shares": 800,
+        "simulated_notional": 3896.0,
+        "close_price": 4.3,
+        "quote_time": "20260819150031",
+        "gross_mark_to_close_return": -0.11704312114989734,
+        "gross_mark_to_close_pnl": -456.0000000000002,
+        "exit_status": "NEXT_TRADING_DAY_OPEN_PENDING"
+      }
+    ]
+  },
+  "promotion_gate": "FAIL",
+  "source_commit": "39d03572059ac63c25a6aecabd22f81a4ee020ab",
+  "source_manifest_sha256": "3178515b20407dc65e6678c3d5c1dc3308c7e5a31e4d751ffed2445b448596aa",
+  "finished_at": "2026-08-19T15:00:45.631717+08:00",
+  "payload_sha256": "d3303142ccff732ea9f7ee259749ea932aa48eddd2ce89d8f0c866c4df56c8f6"
+}
