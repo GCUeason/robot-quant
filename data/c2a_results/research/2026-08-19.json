@@ -1,14 +1,14 @@
 {
   "phase": "RESEARCH",
   "as_of": "2026-08-19",
-  "generated_at": "2026-08-19T16:48:31.846548+08:00",
+  "generated_at": "2026-08-19T16:55:31.909580+08:00",
   "scheduled_at": "2026-08-19T16:35:00+08:00",
-  "started_at": "2026-08-19T16:48:31.846548+08:00",
+  "started_at": "2026-08-19T16:55:31.909580+08:00",
   "execution_permission": "PAPER_ONLY",
   "real_trade_authorized": false,
   "current_new_entry_allowed": false,
-  "retryable": true,
-  "status": "DATA_NOT_READY",
+  "retryable": false,
+  "status": "PARTIAL",
   "market_close_check": {
     "status": "READY",
     "benchmark": "600000",
@@ -18,16 +18,19 @@
   "research_pipeline": {
     "status": "DATA_NOT_READY",
     "optimized": false,
-    "reason": "C2-A 远端命令失败，退出码 1"
+    "reason": "BigQuant cn_stock_bar1m_c 权限未开通；未执行严格研究",
+    "reason_code": "BIGQUANT_ENTITLEMENT_DENIED",
+    "retryable": false
   },
   "next_session_baseline": {
-    "status": "DATA_NOT_READY",
-    "baseline_as_of": "2026-08-14",
-    "reason": "盘后基线截止2026-08-14，尚未到2026-08-19"
+    "status": "READY",
+    "baseline_as_of": "2026-08-19",
+    "reason": null,
+    "data_status": "PROXY"
   },
   "promotion_gate": "FAIL",
-  "source_commit": "c8d26fd1ec76337ffad54eeb6748abbd71b66423",
-  "source_manifest_sha256": "aed3f37e6e8efa29f013b39bc5e63048e74e632379eefa1792c3e8f798059eab",
-  "finished_at": "2026-08-19T16:52:18.391597+08:00",
-  "payload_sha256": "14ce78b48dea40209e859afb5c809a81211c3af787023c1f31c994cd13903a1e"
+  "source_commit": "a1529d34cb9b428b60557822d61b2b81f0f7c397",
+  "source_manifest_sha256": "81a56d8b6e17897f3919a4de1a9300168ff495ae0cc496f9a26dfa4bceb9b1d3",
+  "finished_at": "2026-08-19T16:56:57.237220+08:00",
+  "payload_sha256": "ac99171d8b0c1710a5b6f9932a1b99ccedddd5c689b3d81e843fbff15924aaaa"
 }

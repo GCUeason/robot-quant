@@ -1,10 +1,10 @@
 # C2-A 16:35 盘后研究
 
 - 日期：2026-08-19
-- 总体状态：**DATA_NOT_READY**
+- 总体状态：**PARTIAL**
 - 收盘校验：**READY**；20260819161439
-- 研究流水线：**DATA_NOT_READY**；C2-A 远端命令失败，退出码 1
-- 下一交易日基线：**DATA_NOT_READY**；截止 2026-08-14
+- 研究流水线：**DATA_NOT_READY**；BIGQUANT_ENTITLEMENT_DENIED；BigQuant cn_stock_bar1m_c 权限未开通；未执行严格研究
+- 下一交易日基线：**READY / PROXY**；截止 2026-08-19
 - 模型晋级门槛：**FAIL**
 - 权限：**PAPER_ONLY；不连接券商**
 
