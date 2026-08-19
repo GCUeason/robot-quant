@@ -344,6 +344,7 @@ def compute_intraday_features(
             "ticker": np.repeat(symbols, minute_count),
             "trade_date": pd.Timestamp(universe["trade_date"].iloc[0]).normalize(),
             "pool": np.repeat(stock_rows["pool"].to_numpy(), minute_count),
+            "close": current_close.reshape(-1),
             "amount_burst": amount_burst.reshape(-1),
             "turnover_metric": turnover.reshape(-1),
             "gain": gain.reshape(-1),

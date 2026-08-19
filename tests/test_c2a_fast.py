@@ -15,6 +15,7 @@ from robot_quant.c2a_fast import (
     parse_tencent_day_history,
     parse_tencent_mkline,
     render_scan_result,
+    run_fast_scan,
     save_fast_pack,
 )
 
@@ -73,6 +74,72 @@ def test_latest_complete_cutoff_uses_previous_minute_and_caps_at_1000() -> None:
 def test_latest_complete_cutoff_rejects_too_early_run() -> None:
     with pytest.raises(FastScanDataError, match="09:32前"):
         latest_complete_cutoff(datetime(2026, 8, 18, 9, 31, 30, tzinfo=ZoneInfo("Asia/Shanghai")))
+
+
+def test_run_fast_scan_builds_non_empty_watchlist_from_cutoff_close(tmp_path, monkeypatch) -> None:
+    trade_day = date(2026, 8, 19)
+    universe = pd.DataFrame(
+        [
+            {
+                "trade_date": pd.Timestamp(trade_day),
+                "ticker": "600378",
+                "name": "昊华科技",
+                "pool": "MAIN",
+                "list_date": "2001-01-11",
+                "listing_trading_days": 5_000,
+                "prevclose": 10.0,
+                "prevhigh": 10.2,
+                "avg3_amount": 200_000_000.0,
+                "float_shares": 1_000_000_000.0,
+                "float_mcap": 10_000_000_000.0,
+                "is_st": False,
+                "is_suspended": False,
+                "upper_limit": 11.0,
+                "lower_limit": 9.0,
+                "limit_streak": 0,
+            }
+        ]
+    )
+    pack = FastPack(
+        root=tmp_path,
+        tickers=["600378"],
+        amount_history=np.ones((1, 1, 20)),
+        volume_history=np.ones((1, 1, 20)),
+        pointers=np.zeros(1, dtype=np.int64),
+        counts=np.full(1, 20, dtype=np.int64),
+        last_processed_date=pd.Timestamp("2026-08-18"),
+        universe=universe,
+        manifest={},
+    )
+    bars = pd.DataFrame(
+        {
+            "timestamp": [pd.Timestamp("2026-08-19 09:31")],
+            "ticker": ["600378"],
+            "close": [10.31],
+            "volume": [1_000.0],
+            "amount": [10_310.0],
+        }
+    )
+    monkeypatch.setattr("robot_quant.c2a_fast.load_fast_pack", lambda *_: pack)
+    monkeypatch.setattr("robot_quant.c2a_fast.previous_market_day", lambda *_: date(2026, 8, 18))
+    monkeypatch.setattr("robot_quant.c2a_fast.fetch_quotes_fast", lambda *_: pd.DataFrame())
+    monkeypatch.setattr("robot_quant.c2a_fast.build_fast_universe", lambda *_: universe)
+    monkeypatch.setattr("robot_quant.c2a_fast.fetch_minutes_fast", lambda *_: (bars, {}))
+    monkeypatch.setattr("robot_quant.c2a_fast.fetch_candidate_ohlc_fast", lambda *_: bars)
+    monkeypatch.setattr(
+        "robot_quant.c2a_fast.simulate_entry_day", lambda *args, **kwargs: ([], 10_000.0, [])
+    )
+
+    result = run_fast_scan(
+        tmp_path,
+        trade_day=trade_day,
+        cutoff=time(9, 31),
+        now=datetime(2026, 8, 19, 9, 32, tzinfo=ZoneInfo("Asia/Shanghai")),
+    )
+
+    assert result["candidate_count"] == 1
+    assert result["watchlist"][0]["ticker"] == "600378"
+    assert result["watchlist"][0]["scan_price"] == pytest.approx(10.31)
 
 
 def test_parse_tencent_mkline_keeps_only_requested_day_and_cutoff() -> None:

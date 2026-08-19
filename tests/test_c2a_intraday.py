@@ -1,11 +1,15 @@
 import json
 from datetime import date, time
+from types import SimpleNamespace
 
+import numpy as np
 import pandas as pd
 import pytest
 
+from robot_quant.c2a import C2AParameters
 from robot_quant.c2a_intraday import (
     audit_completed_window,
+    compute_intraday_features,
     fetch_candidate_ohlc,
     parse_tencent_cumulative_minutes,
 )
@@ -74,6 +78,53 @@ def test_intraday_audit_rejects_one_missing_completed_minute() -> None:
 
     with pytest.raises(ValueError, match="完整分钟"):
         audit_completed_window(bars, {"600378"}, time(10, 0))
+
+
+def test_compute_intraday_features_keeps_cutoff_close_for_watchlist() -> None:
+    params = C2AParameters.optimized_challenger()
+    bars = pd.DataFrame(
+        {
+            "timestamp": [pd.Timestamp("2026-08-19 09:31")],
+            "ticker": ["600378"],
+            "close": [10.31],
+            "volume": [1_000.0],
+            "amount": [10_310.0],
+        }
+    )
+    universe = pd.DataFrame(
+        [
+            {
+                "trade_date": pd.Timestamp("2026-08-19"),
+                "ticker": "600378",
+                "name": "昊华科技",
+                "pool": "MAIN",
+                "list_date": "2001-01-11",
+                "listing_trading_days": 5_000,
+                "prevclose": 10.0,
+                "prevhigh": 10.2,
+                "avg3_amount": 200_000_000.0,
+                "float_shares": 1_000_000_000.0,
+                "float_mcap": 10_000_000_000.0,
+                "is_st": False,
+                "is_suspended": False,
+                "upper_limit": 11.0,
+                "lower_limit": 9.0,
+                "limit_streak": 0,
+            }
+        ]
+    )
+    state = SimpleNamespace(
+        tickers=["600378"],
+        amount_history=np.ones((1, 1, params.baseline_days)),
+        volume_history=np.ones((1, 1, params.baseline_days)),
+        counts=np.full(1, params.baseline_days),
+        last_processed_date=pd.Timestamp("2026-08-18"),
+    )
+    cache = SimpleNamespace(_load_state=lambda: state)
+
+    features = compute_intraday_features(bars, universe, cache, params, time(9, 31))
+
+    assert features.loc[0, "close"] == pytest.approx(10.31)
 
 
 def test_candidate_ohlc_retries_only_transient_failures(monkeypatch) -> None:
