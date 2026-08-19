@@ -401,6 +401,28 @@ def run_research_phase(
         _write_phase_artifacts(root, "research", payload, _research_markdown(payload))
         return payload
 
+    next_baseline_status = "READY"
+    next_baseline_as_of = None
+    next_baseline_reason = None
+    try:
+        _ensure_local_fast_pack(root, host, remote_root)
+        baseline_result = prepare_fast_pack(
+            root,
+            through=day,
+            host=host,
+            remote_root=remote_root,
+        )
+        if float(baseline_result["coverage"]) < MIN_FAST_COVERAGE:
+            raise FastScanDataError(f"盘后基线覆盖不足: {float(baseline_result['coverage']):.2%}")
+        baseline_date = date.fromisoformat(str(baseline_result["last_processed_date"]))
+        next_baseline_as_of = baseline_date.isoformat()
+        if baseline_date < day:
+            raise FastScanDataError(f"盘后基线截止{next_baseline_as_of}，尚未到{day.isoformat()}")
+        push_remote_fast_pack(root, host=host, remote_root=remote_root)
+    except (FastScanDataError, RuntimeError, ValueError, OSError) as error:
+        next_baseline_status = "DATA_NOT_READY"
+        next_baseline_reason = _safe_error(error)
+
     research_status = "COMPLETED"
     research_reason = None
     try:
@@ -416,26 +438,6 @@ def run_research_phase(
     except (RuntimeError, ValueError, OSError) as error:
         research_status = "DATA_NOT_READY"
         research_reason = _safe_error(error)
-
-    next_baseline_status = "READY"
-    next_baseline_as_of = None
-    next_baseline_reason = None
-    try:
-        export_remote_fast_pack(
-            root,
-            host=host,
-            remote_root=remote_root,
-            sync_code=research_status != "COMPLETED",
-        )
-        fetch_remote_fast_pack(root, host=host, remote_root=remote_root)
-        next_baseline_as_of = load_fast_pack(root / "data" / "c2a_fast").last_processed_date.date()
-        next_baseline_as_of = next_baseline_as_of.isoformat()
-        if next_baseline_as_of != day.isoformat():
-            next_baseline_status = "DATA_NOT_READY"
-            next_baseline_reason = f"盘后基线截止{next_baseline_as_of}，尚未到{day.isoformat()}"
-    except (FastScanDataError, RuntimeError, ValueError, OSError) as error:
-        next_baseline_status = "DATA_NOT_READY"
-        next_baseline_reason = _safe_error(error)
 
     components = (research_status, next_baseline_status)
     status = "READY" if components == ("COMPLETED", "READY") else "PARTIAL"

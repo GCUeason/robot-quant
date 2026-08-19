@@ -3,7 +3,6 @@ from __future__ import annotations
 import hashlib
 import json
 from datetime import datetime
-from types import SimpleNamespace
 from zoneinfo import ZoneInfo
 
 import pandas as pd
@@ -74,7 +73,6 @@ def test_prepare_writes_latest_and_dated_status_without_publishing_pack(
         "robot_quant.c2a_cloud.push_remote_fast_pack",
         lambda *args, **kwargs: calls.append("push"),
     )
-
     result = run_prepare_phase(
         tmp_path,
         now=datetime(2026, 8, 19, 8, 45, tzinfo=SHANGHAI),
@@ -319,16 +317,31 @@ def test_research_runs_after_close_without_delaying_review(tmp_path, monkeypatch
         lambda *args, **kwargs: calls.append("pipeline"),
     )
     monkeypatch.setattr(
+        "robot_quant.c2a_cloud._ensure_local_fast_pack",
+        lambda *args, **kwargs: calls.append("ensure"),
+    )
+    monkeypatch.setattr(
+        "robot_quant.c2a_cloud.prepare_fast_pack",
+        lambda *args, **kwargs: (
+            calls.append("prepare")
+            or {
+                "last_processed_date": "2026-08-19",
+                "updated_days": 1,
+                "coverage": 1.0,
+            }
+        ),
+    )
+    monkeypatch.setattr(
+        "robot_quant.c2a_cloud.push_remote_fast_pack",
+        lambda *args, **kwargs: calls.append("push"),
+    )
+    monkeypatch.setattr(
         "robot_quant.c2a_cloud.export_remote_fast_pack",
-        lambda *args, **kwargs: calls.append("export"),
+        lambda *args, **kwargs: pytest.fail("盘后基线不得从研究缓存重导"),
     )
     monkeypatch.setattr(
         "robot_quant.c2a_cloud.fetch_remote_fast_pack",
-        lambda *args, **kwargs: calls.append("fetch"),
-    )
-    monkeypatch.setattr(
-        "robot_quant.c2a_cloud.load_fast_pack",
-        lambda *args, **kwargs: SimpleNamespace(last_processed_date=pd.Timestamp("2026-08-19")),
+        lambda *args, **kwargs: pytest.fail("盘后基线不得从研究缓存覆盖"),
     )
 
     result = run_research_phase(
@@ -340,8 +353,65 @@ def test_research_runs_after_close_without_delaying_review(tmp_path, monkeypatch
     assert result["status"] == "READY"
     assert result["research_pipeline"]["status"] == "COMPLETED"
     assert result["next_session_baseline"]["baseline_as_of"] == "2026-08-19"
-    assert calls == ["pipeline", "export", "fetch"]
+    assert calls == ["ensure", "prepare", "push", "pipeline"]
     assert (tmp_path / "reports/c2a_research_latest.md").exists()
+
+
+def test_research_failure_does_not_replace_newer_fast_baseline(tmp_path, monkeypatch) -> None:
+    quotes = pd.DataFrame(
+        [{"ticker": "600000", "price": 12.0, "quote_time": "20260819153001"}]
+    ).set_index("ticker")
+    calls = []
+    monkeypatch.setattr("robot_quant.c2a_cloud.fetch_quotes_fast", lambda tickers: quotes)
+    monkeypatch.setattr(
+        "robot_quant.c2a_cloud._ensure_local_fast_pack",
+        lambda *args, **kwargs: calls.append("ensure"),
+    )
+    monkeypatch.setattr(
+        "robot_quant.c2a_cloud.prepare_fast_pack",
+        lambda *args, **kwargs: (
+            calls.append("prepare")
+            or {
+                "last_processed_date": "2026-08-19",
+                "updated_days": 1,
+                "coverage": 1.0,
+            }
+        ),
+    )
+    monkeypatch.setattr(
+        "robot_quant.c2a_cloud.push_remote_fast_pack",
+        lambda *args, **kwargs: calls.append("push"),
+    )
+
+    def unavailable_pipeline(*args, **kwargs):
+        calls.append("pipeline")
+        raise RuntimeError("BigQuant minute entitlement unavailable")
+
+    monkeypatch.setattr("robot_quant.c2a_cloud.run_remote_pipeline", unavailable_pipeline)
+    monkeypatch.setattr(
+        "robot_quant.c2a_cloud.export_remote_fast_pack",
+        lambda *args, **kwargs: pytest.fail("研究失败后不得从陈旧研究缓存重导基线"),
+    )
+    monkeypatch.setattr(
+        "robot_quant.c2a_cloud.fetch_remote_fast_pack",
+        lambda *args, **kwargs: pytest.fail("研究失败后不得拉取陈旧研究基线"),
+    )
+
+    result = run_research_phase(
+        tmp_path,
+        now=datetime(2026, 8, 19, 16, 35, tzinfo=SHANGHAI),
+        optimize=False,
+    )
+
+    assert result["status"] == "PARTIAL"
+    assert result["research_pipeline"]["status"] == "DATA_NOT_READY"
+    assert result["next_session_baseline"] == {
+        "status": "READY",
+        "baseline_as_of": "2026-08-19",
+        "reason": None,
+    }
+    assert result["retryable"] is True
+    assert calls == ["ensure", "prepare", "push", "pipeline"]
 
 
 def test_research_fails_closed_on_non_closing_market_snapshot(tmp_path, monkeypatch) -> None:
