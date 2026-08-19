@@ -4,7 +4,7 @@
 - 总体状态：**RECONSTRUCTED_REVIEW**
 - 复盘类型：**事后重建复盘**
 - 来源早盘扫描：**RECONSTRUCTED_SIMULATED_ENTRY / LATE**
-- 收盘校验：**READY**；20260819150042
+- 收盘校验：**READY**；20260819161439
 - 早盘对账：**COMPLETED**；已按当日收盘快照核对
 - 模型晋级门槛：**FAIL**
 - 权限：**PAPER_ONLY；不连接券商**
