@@ -1,0 +1,33 @@
+{
+  "phase": "RESEARCH",
+  "as_of": "2026-08-19",
+  "generated_at": "2026-08-19T16:35:03.903343+08:00",
+  "scheduled_at": "2026-08-19T16:35:00+08:00",
+  "started_at": "2026-08-19T16:35:03.903343+08:00",
+  "execution_permission": "PAPER_ONLY",
+  "real_trade_authorized": false,
+  "current_new_entry_allowed": false,
+  "retryable": true,
+  "status": "DATA_NOT_READY",
+  "market_close_check": {
+    "status": "READY",
+    "benchmark": "600000",
+    "quote_time": "20260819161439",
+    "reason": null
+  },
+  "research_pipeline": {
+    "status": "DATA_NOT_READY",
+    "optimized": false,
+    "reason": "C2-A 远端命令失败，退出码 1"
+  },
+  "next_session_baseline": {
+    "status": "DATA_NOT_READY",
+    "baseline_as_of": "2026-08-14",
+    "reason": "盘后基线截止2026-08-14，尚未到2026-08-19"
+  },
+  "promotion_gate": "FAIL",
+  "source_commit": "001f1c41c27cf6a921bf365f080c0e4e25e1d60c",
+  "source_manifest_sha256": "723c86a8611994a6727870d34a2366786f4bda04a271ff5c0e769e7e40f92314",
+  "finished_at": "2026-08-19T16:40:27.375427+08:00",
+  "payload_sha256": "5f11c7b2584d295fb1970048687d00b50e820edbdba5a57a8e7bf1fff222b90c"
+}
