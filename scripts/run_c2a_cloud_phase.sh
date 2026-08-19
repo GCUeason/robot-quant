@@ -179,7 +179,19 @@ if [[ -n "$(git status --porcelain --untracked-files=no)" ]]; then
   fail_phase_outbox "云端仓库存在未提交的已跟踪改动" 2
 fi
 
-if ! git_network fetch origin main || ! git rebase origin/main; then
+if ! git_network fetch origin main; then
+  fail_phase_outbox "云端仓库无法同步 origin/main" 1
+fi
+
+ahead_count=""
+if ! ahead_count="$(git rev-list --count origin/main..HEAD)"; then
+  fail_phase_outbox "云端仓库无法校验本地提交边界" 1
+fi
+if [[ "$ahead_count" != "0" ]]; then
+  fail_phase_outbox "云端仓库存在未推送的本地提交" 2
+fi
+
+if ! git rebase origin/main; then
   git rebase --abort >/dev/null 2>&1 || true
   fail_phase_outbox "云端仓库无法同步 origin/main" 1
 fi

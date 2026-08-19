@@ -182,7 +182,39 @@ def test_dirty_cloud_tree_publishes_failure_from_clean_outbox(tmp_path) -> None:
     assert (inspect / "README.md").read_text(encoding="utf-8") == "clean\n"
 
 
-def test_rebase_conflict_publishes_failure_from_clean_outbox(tmp_path) -> None:
+def test_unpushed_cloud_commit_is_rejected_and_not_pushed(tmp_path) -> None:
+    remote, _, cloud, environment = _cloud_repository(tmp_path)
+    inspect = tmp_path / "inspect"
+    _git("config", "user.name", "cloud", cwd=cloud)
+    _git("config", "user.email", "cloud@example.com", cwd=cloud)
+    (cloud / "LOCAL_ONLY.txt").write_text("must not be published\n", encoding="utf-8")
+    _git("add", "LOCAL_ONLY.txt", cwd=cloud)
+    _git("commit", "-m", "local-only commit", cwd=cloud)
+
+    completed = subprocess.run(
+        [str(ROOT / "scripts/run_c2a_cloud_phase.sh"), "scan"],
+        env=environment,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert completed.returncode == 2
+    subprocess.run(
+        ["git", "clone", str(remote), str(inspect)],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    payload = json.loads(
+        (inspect / "data/c2a_results/fast_latest.json").read_text(encoding="utf-8")
+    )
+    assert payload["status"] == "DATA_NOT_READY"
+    assert "未推送的本地提交" in payload["reason"]
+    assert not (inspect / "LOCAL_ONLY.txt").exists()
+
+
+def test_diverged_cloud_history_publishes_failure_from_clean_outbox(tmp_path) -> None:
     remote, seed, cloud, environment = _cloud_repository(tmp_path)
     inspect = tmp_path / "inspect"
     _git("config", "user.name", "cloud", cwd=cloud)
@@ -203,7 +235,7 @@ def test_rebase_conflict_publishes_failure_from_clean_outbox(tmp_path) -> None:
         text=True,
     )
 
-    assert completed.returncode == 1
+    assert completed.returncode == 2
     subprocess.run(
         ["git", "clone", str(remote), str(inspect)],
         check=True,
@@ -214,5 +246,5 @@ def test_rebase_conflict_publishes_failure_from_clean_outbox(tmp_path) -> None:
         (inspect / "data/c2a_results/fast_latest.json").read_text(encoding="utf-8")
     )
     assert payload["status"] == "DATA_NOT_READY"
-    assert "无法同步" in payload["reason"]
+    assert "未推送的本地提交" in payload["reason"]
     assert (inspect / "README.md").read_text(encoding="utf-8") == "remote authoritative change\n"

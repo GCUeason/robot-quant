@@ -218,12 +218,53 @@ def test_review_reconciles_only_same_day_scan_and_marks_next_open_pending(
         now=datetime(2026, 8, 19, 16, 30, tzinfo=SHANGHAI),
     )
 
-    assert result["status"] == "READY"
+    assert result["status"] == "RECONSTRUCTED_REVIEW"
+    assert result["review_mode"] == "RECONSTRUCTED"
+    assert result["source_scan_status"] == "RECONSTRUCTED_SIMULATED_ENTRY"
+    assert result["source_delivery_timing"] == "LATE"
     entry = result["morning_signal"]["entries"][0]
     assert entry["close_price"] == 3.42
     assert entry["gross_mark_to_close_pnl"] == pytest.approx(240.0)
     assert entry["exit_status"] == "NEXT_TRADING_DAY_OPEN_PENDING"
     assert result["execution_permission"] == "PAPER_ONLY"
+    report = (tmp_path / "reports/c2a_review_latest.md").read_text(encoding="utf-8")
+    assert "事后重建复盘" in report
+    assert "RECONSTRUCTED_SIMULATED_ENTRY / LATE" in report
+
+
+def test_review_marks_on_time_scan_ready(tmp_path, monkeypatch) -> None:
+    scan_path = tmp_path / "data" / "c2a_results" / "intraday" / "2026-08-19.json"
+    scan_path.parent.mkdir(parents=True)
+    scan_path.write_text(
+        json.dumps(
+            {
+                **_scan_result(),
+                "status": "SIMULATED_ENTRY",
+                "delivery_timing": "ON_TIME",
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    quotes = pd.DataFrame(
+        [
+            {"ticker": "600000", "price": 12.0, "quote_time": "20260819153001"},
+            {"ticker": "000523", "price": 3.42, "quote_time": "20260819153001"},
+        ]
+    ).set_index("ticker")
+    monkeypatch.setattr(
+        "robot_quant.c2a_cloud.fetch_quotes_fast", lambda tickers: quotes.loc[tickers]
+    )
+
+    result = run_review_phase(
+        tmp_path,
+        now=datetime(2026, 8, 19, 16, 30, tzinfo=SHANGHAI),
+    )
+
+    assert result["status"] == "READY"
+    assert result["review_mode"] == "ON_TIME"
+    assert result["source_scan_status"] == "SIMULATED_ENTRY"
+    assert result["source_delivery_timing"] == "ON_TIME"
 
 
 def test_review_does_not_reuse_yesterdays_latest_signal(tmp_path, monkeypatch) -> None:

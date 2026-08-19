@@ -317,9 +317,17 @@ def run_review_phase(
         morning_signal = _review_morning_signal(scan, day)
         if morning_signal["status"] == "DATA_NOT_READY":
             raise FastScanDataError(morning_signal.get("reason") or "当日收盘对账失败")
+        source_scan_status = str(scan.get("status") or "UNKNOWN")
+        source_delivery_timing = str(scan.get("delivery_timing") or "UNKNOWN")
+        reconstructed = source_delivery_timing != "ON_TIME" or source_scan_status.startswith(
+            "RECONSTRUCTED_"
+        )
         payload.update(
             {
-                "status": "READY",
+                "status": "RECONSTRUCTED_REVIEW" if reconstructed else "READY",
+                "review_mode": "RECONSTRUCTED" if reconstructed else "ON_TIME",
+                "source_scan_status": source_scan_status,
+                "source_delivery_timing": source_delivery_timing,
                 "market_close_check": market_close,
                 "morning_signal": morning_signal,
                 "promotion_gate": "FAIL",
@@ -627,10 +635,21 @@ def _review_markdown(payload: dict) -> str:
         else "无可复盘的当日模拟入场。"
     )
     market = payload["market_close_check"]
+    source_scan_status = payload.get("source_scan_status") or "UNKNOWN"
+    source_delivery_timing = payload.get("source_delivery_timing") or "UNKNOWN"
+    review_mode = (
+        "事后重建复盘"
+        if payload.get("review_mode") == "RECONSTRUCTED"
+        else "准点扫描复盘"
+        if payload.get("review_mode") == "ON_TIME"
+        else "不可复盘"
+    )
     return f"""# C2-A 16:30 盘后复盘
 
 - 日期：{payload["as_of"]}
 - 总体状态：**{payload["status"]}**
+- 复盘类型：**{review_mode}**
+- 来源早盘扫描：**{source_scan_status} / {source_delivery_timing}**
 - 收盘校验：**{market["status"]}**；{market.get("quote_time") or market.get("reason") or "缺失"}
 - 早盘对账：**{morning["status"]}**；{morning.get("reason") or "已按当日收盘快照核对"}
 - 模型晋级门槛：**FAIL**
