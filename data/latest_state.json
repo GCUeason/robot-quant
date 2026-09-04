@@ -1,9 +1,9 @@
 {
   "approved_probability": 0.5,
   "baseline_max_drawdown": -0.12233490943949865,
-  "baseline_profit": -233.55884999999762,
-  "baseline_roi": -0.013738755882352849,
-  "baseline_value": 16766.441150000002,
+  "baseline_profit": -586.3588500000005,
+  "baseline_roi": -0.0344916970588236,
+  "baseline_value": 16413.64115,
   "data_provenance": {
     "benchmark": "tencent_qfq_sh000300",
     "etf": "tencent_qfq_sz159530",
@@ -19,13 +19,13 @@
       }
     ],
     "model_features": "cnindex_official_980022",
-    "robot_index_end": "2026-09-03",
-    "robot_index_sample_count": 2837,
+    "robot_index_end": "2026-09-04",
+    "robot_index_sample_count": 2838,
     "robot_index_start": "2015-01-05"
   },
   "distribution_diagnostics": [
     {
-      "current_value": -0.009693169916051403,
+      "current_value": -0.017238007303724157,
       "feature": "return_5",
       "lower_bound": -0.124074603288057,
       "status": "in_range",
@@ -33,7 +33,7 @@
       "upper_bound": 0.11892545812153948
     },
     {
-      "current_value": -0.055408507831350096,
+      "current_value": -0.08378932232967917,
       "feature": "return_20",
       "lower_bound": -0.2438421963610554,
       "status": "in_range",
@@ -41,7 +41,7 @@
       "upper_bound": 0.25368376324839553
     },
     {
-      "current_value": -0.1816304562274097,
+      "current_value": -0.15871509082837998,
       "feature": "return_60",
       "lower_bound": -0.2934383913980748,
       "status": "in_range",
@@ -49,7 +49,7 @@
       "upper_bound": 0.41417829400390777
     },
     {
-      "current_value": -0.028429653464122184,
+      "current_value": -0.043350467848492946,
       "feature": "distance_ma20",
       "lower_bound": -0.15051589378988556,
       "status": "in_range",
@@ -57,7 +57,7 @@
       "upper_bound": 0.12898568119502593
     },
     {
-      "current_value": -0.07932626426659328,
+      "current_value": -0.09484485906177065,
       "feature": "distance_ma60",
       "lower_bound": -0.2061867599983155,
       "status": "in_range",
@@ -65,7 +65,7 @@
       "upper_bound": 0.21558669581030224
     },
     {
-      "current_value": 0.41869357742377067,
+      "current_value": 0.41984519953534155,
       "feature": "volatility_20",
       "lower_bound": 0.11949743568849865,
       "status": "in_range",
@@ -73,7 +73,7 @@
       "upper_bound": 0.8239429839348374
     },
     {
-      "current_value": 0.8197397964909999,
+      "current_value": 1.03528060958213,
       "feature": "volume_ratio_20",
       "lower_bound": 0.5292275650060771,
       "status": "in_range",
@@ -81,7 +81,7 @@
       "upper_bound": 1.7595331904895863
     },
     {
-      "current_value": -0.03418222964305462,
+      "current_value": -0.052605624167598175,
       "feature": "relative_strength_20",
       "lower_bound": -0.12497583001697374,
       "status": "in_range",
@@ -89,7 +89,7 @@
       "upper_bound": 0.15921091981919075
     },
     {
-      "current_value": -0.03761495899524314,
+      "current_value": -0.03836744158264482,
       "feature": "market_trend_120",
       "lower_bound": -0.2032798741111627,
       "status": "in_range",
@@ -97,7 +97,7 @@
       "upper_bound": 0.17665374523046398
     }
   ],
-  "etf_close": 1.326,
+  "etf_close": 1.298,
   "executable_target_weight": 1.0,
   "execution_gate": {
     "executable_target_weight": 1.0,
@@ -114,8 +114,8 @@
   "execution_policy": "fixed_dca_only",
   "forecast_horizons": {
     "10": {
-      "candidate_count": 2102,
-      "distance_match_count": 384,
+      "candidate_count": 2103,
+      "distance_match_count": 328,
       "downside_price_p10": null,
       "drawdown_5pct_probability": null,
       "drawdown_5pct_sample_count": 0,
@@ -130,11 +130,11 @@
       "expected_price": null,
       "expected_profit_on_capital": null,
       "loss_probability": null,
-      "maximum_similarity_distance": 1.0662448704607557,
+      "maximum_similarity_distance": 1.1478093747497389,
       "mean_return": null,
       "median_return": null,
-      "regime_match_count": 974,
-      "relative_strength_match_count": 384,
+      "regime_match_count": 975,
+      "relative_strength_match_count": 328,
       "return_p10": null,
       "return_p90": null,
       "sample_count": 40,
@@ -151,8 +151,8 @@
       "validation_zero_baseline_mae": 0.0485809926853402
     },
     "20": {
-      "candidate_count": 2092,
-      "distance_match_count": 381,
+      "candidate_count": 2093,
+      "distance_match_count": 327,
       "downside_price_p10": null,
       "drawdown_5pct_probability": null,
       "drawdown_5pct_sample_count": 0,
@@ -162,19 +162,19 @@
       "drawdown_trough_day_median": null,
       "drawdown_trough_day_p25": null,
       "drawdown_trough_day_p75": null,
-      "effective_sample_count": 40,
+      "effective_sample_count": 37,
       "evidence_status": "unvalidated",
       "expected_price": null,
       "expected_profit_on_capital": null,
       "loss_probability": null,
-      "maximum_similarity_distance": 1.432710068303983,
+      "maximum_similarity_distance": 1.5825793259931498,
       "mean_return": null,
       "median_return": null,
-      "regime_match_count": 965,
-      "relative_strength_match_count": 381,
+      "regime_match_count": 966,
+      "relative_strength_match_count": 327,
       "return_p10": null,
       "return_p90": null,
-      "sample_count": 40,
+      "sample_count": 37,
       "unavailable_reason": "预测未同时击败零收益MAE基线并达到高于50%的方向准确率，收益预测已停用",
       "upside_price_p90": null,
       "validation_beats_zero_baseline": false,
@@ -188,8 +188,8 @@
       "validation_zero_baseline_mae": 0.07271056483935988
     },
     "5": {
-      "candidate_count": 2107,
-      "distance_match_count": 384,
+      "candidate_count": 2108,
+      "distance_match_count": 328,
       "downside_price_p10": null,
       "drawdown_5pct_probability": null,
       "drawdown_5pct_sample_count": 0,
@@ -204,11 +204,11 @@
       "expected_price": null,
       "expected_profit_on_capital": null,
       "loss_probability": null,
-      "maximum_similarity_distance": 0.9547537379867678,
+      "maximum_similarity_distance": 0.9850223435548217,
       "mean_return": null,
       "median_return": null,
-      "regime_match_count": 979,
-      "relative_strength_match_count": 384,
+      "regime_match_count": 980,
+      "relative_strength_match_count": 328,
       "return_p10": null,
       "return_p90": null,
       "sample_count": 40,
@@ -251,17 +251,17 @@
       "drawdown_5pct_probability": 0.5,
       "drawdown_event_probability": 0.85,
       "drawdown_event_sample_count": 34,
-      "drawdown_trough_day_p25": 10.5,
+      "drawdown_trough_day_p25": 10.25,
       "drawdown_trough_day_p75": 17.75,
-      "end_date": "2026-08-06",
+      "end_date": "2026-08-07",
       "loss_probability": 0.55,
       "median_return": -0.02565106602932571,
       "minimum_sample_count": 20,
       "reference_kind": "relative_strength_direction_history",
-      "return_p10": -0.08450992046459421,
+      "return_p10": -0.08464703049833817,
       "return_p90": 0.13032390068158206,
       "sample_count": 40,
-      "scope_sample_count": 1412,
+      "scope_sample_count": 1413,
       "start_date": "2022-01-05",
       "status": "descriptive"
     },
@@ -288,27 +288,27 @@
   "initial_contribution": 15000.0,
   "initial_target_weight": 1.0,
   "is_out_of_distribution": false,
-  "market_date": "2026-09-03",
+  "market_date": "2026-09-04",
   "model_control_enabled": false,
   "model_kind": "shrunk_logistic_regression",
   "model_selection_status": "retrospective_challenger",
   "model_validation": {
     "accuracy_wilson95_high": 0.5761638261246737,
     "accuracy_wilson95_low": 0.4519665346004817,
-    "brier_skill_score": 0.0017341379996071993,
-    "calibrated_brier": 0.2495664655000982,
-    "calibrated_sample_count": 2442,
+    "brier_skill_score": 0.0017095408971251613,
+    "calibrated_brier": 0.2495726147757187,
+    "calibrated_sample_count": 2443,
     "calibration_method": "fixed_linear_shrinkage_to_50pct",
     "confidence_direction_accuracy": 0.5142857142857142,
     "confidence_sample_count": 245,
     "constant_50_brier": 0.25,
-    "direction_accuracy": 0.5081900081900081,
+    "direction_accuracy": 0.5079819893573475,
     "passes_auc_baseline": true,
     "passes_brier_baseline": true,
     "passes_regime_stability": false,
     "passes_stability": false,
     "passes_time_stability": false,
-    "raw_brier": 0.2520304848578792,
+    "raw_brier": 0.25205455702470897,
     "regime_windows": [
       {
         "brier": 0.2500863508372129,
@@ -332,15 +332,15 @@
         "sample_count": 888
       },
       {
-        "brier": 0.24557613268227665,
+        "brier": 0.24568930537965064,
         "passes": true,
         "regime": "down_high_vol",
-        "roc_auc": 0.5468656716417911,
-        "sample_count": 167
+        "roc_auc": 0.5470588235294118,
+        "sample_count": 168
       }
     ],
-    "roc_auc": 0.5103907569089889,
-    "score_brier": 0.2495664655000982,
+    "roc_auc": 0.5101044454730232,
+    "score_brier": 0.2495726147757187,
     "stability_pass_count": 24,
     "stability_window_count": 49,
     "stability_windows": [
@@ -873,13 +873,13 @@
         "window_kind": "fixed_block"
       },
       {
-        "brier": 0.25287169464158044,
-        "end_date": "2026-08-20",
+        "brier": 0.2531441935066856,
+        "end_date": "2026-08-21",
         "passes": false,
         "passes_auc_baseline": true,
         "passes_brier_baseline": false,
-        "roc_auc": 0.7011764705882353,
-        "sample_count": 42,
+        "roc_auc": 0.7104072398190046,
+        "sample_count": 43,
         "start_date": "2026-06-24",
         "window_kind": "fixed_block"
       }
@@ -890,20 +890,20 @@
   "monthly_contribution": 1000.0,
   "next_target_weight": 1.0,
   "ood_features": "",
-  "prediction_accuracy": 0.48602759108595683,
-  "prediction_probability": 0.517347694116437,
+  "prediction_accuracy": 0.48585572842998587,
+  "prediction_probability": 0.5258797127327959,
   "probability_shrinkage": 0.25,
-  "quality_gate_auc": 0.6026272577996716,
-  "quality_gate_brier": 0.25247927324066555,
+  "quality_gate_auc": 0.5844155844155844,
+  "quality_gate_brier": 0.252012900392006,
   "quality_gate_passed": false,
   "quality_gate_reason": "最近成熟窗口未同时通过Brier<0.25与AUC>0.5",
   "quality_gate_sample_count": 50,
-  "raw_prediction_probability": 0.5693907764657481,
+  "raw_prediction_probability": 0.6035188509311833,
   "research_target_weight": 0.5,
   "sell_indicators": {
     "action": "unavailable",
-    "current_market_trend_120": -0.03761495899524314,
-    "current_volatility_20": 0.41869357742377067,
+    "current_market_trend_120": -0.03836744158264482,
+    "current_volatility_20": 0.41984519953534155,
     "exit_loss_probability_trigger": 0.65,
     "probability_exit_trigger": 0.35,
     "probability_reduce_trigger": 0.45,
@@ -973,26 +973,26 @@
   "shadow_roi": -0.024558882352941236,
   "shadow_target_weight": 0.0,
   "shadow_validation": {
-    "model_excess_value": -183.94215000000258,
+    "model_excess_value": 168.85785000000033,
     "reason": "影子策略仅用于衡量逐日成熟样本门控，不具备交易授权",
-    "sample_days": 34,
+    "sample_days": 35,
     "status": "observation_only"
   },
   "shadow_value": 16582.499,
-  "shadow_value_difference": -183.94215000000258,
+  "shadow_value_difference": 168.85785000000033,
   "signal_status": "observation_only",
   "simulation_start_date": "2026-07-20",
   "simulation_status": "active",
   "strategy_max_drawdown": -0.12233490943949865,
-  "strategy_profit": -233.55884999999762,
-  "strategy_roi": -0.013738755882352849,
+  "strategy_profit": -586.3588500000005,
+  "strategy_roi": -0.0344916970588236,
   "strategy_validation": {
     "model_excess_value": 0.0,
     "passes_fixed_dca": false,
     "reason": "模型未通过质量门控，当前不具备可验证的交易Alpha",
     "status": "baseline_only"
   },
-  "strategy_value": 16766.441150000002,
+  "strategy_value": 16413.64115,
   "strategy_value_difference": 0.0,
   "total_contributions": 17000.0,
   "training_oof_auc": 0.5187533985002339,
