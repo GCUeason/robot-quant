@@ -1,33 +1,37 @@
 {
   "phase": "RESEARCH",
   "as_of": "2026-09-07",
-  "generated_at": "2026-09-07T16:35:09.694420+08:00",
+  "generated_at": "2026-09-07T16:37:27.359493+08:00",
   "scheduled_at": "2026-09-07T16:35:00+08:00",
-  "started_at": "2026-09-07T16:35:09.694420+08:00",
-  "status": "DATA_NOT_READY",
-  "reason": "云端仓库无法同步 origin/main",
+  "started_at": "2026-09-07T16:37:27.359493+08:00",
   "execution_permission": "PAPER_ONLY",
   "real_trade_authorized": false,
   "current_new_entry_allowed": false,
-  "promotion_gate": "FAIL",
-  "retryable": true,
-  "source_commit": "4864b1ea71d044705eed2aa712196271776aac50",
-  "source_manifest_sha256": null,
+  "retryable": false,
+  "status": "PARTIAL",
   "market_close_check": {
-    "status": "DATA_NOT_READY",
-    "quote_time": null,
-    "reason": "云端仓库无法同步 origin/main"
+    "status": "READY",
+    "benchmark": "600000",
+    "quote_time": "20260907161445",
+    "reason": null
   },
   "research_pipeline": {
     "status": "DATA_NOT_READY",
     "optimized": false,
-    "reason": "云端仓库无法同步 origin/main"
+    "reason": "BigQuant cn_stock_bar1m_c 权限未开通；未执行严格研究",
+    "reason_code": "BIGQUANT_ENTITLEMENT_DENIED",
+    "retryable": false,
+    "artifact_sha256": {}
   },
   "next_session_baseline": {
-    "status": "DATA_NOT_READY",
-    "baseline_as_of": null,
-    "reason": "云端仓库无法同步 origin/main"
+    "status": "READY",
+    "baseline_as_of": "2026-09-07",
+    "reason": null,
+    "data_status": "PROXY"
   },
-  "finished_at": "2026-09-07T16:35:09.696566+08:00",
-  "payload_sha256": "22e0a9516cb6365ea9a2b69ced6062ee019f5e4c86bbe679c9107d63fda01fff"
+  "promotion_gate": "FAIL",
+  "source_commit": "440ca4fd20d5c937ca9fb748ef490d6207745cdf",
+  "source_manifest_sha256": "9cbe0176283a16150a917222f70d4bbbc94bb676a1faa06af25bf12e3bf6cc7b",
+  "finished_at": "2026-09-07T16:40:33.722453+08:00",
+  "payload_sha256": "c8e3459b522e18d4e66a5c8c63e80c96594b4cf365c831f0070502502e6b88c4"
 }
