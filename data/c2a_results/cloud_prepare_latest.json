@@ -1,9 +1,9 @@
 {
   "phase": "PREPARE",
   "as_of": "2026-09-23",
-  "generated_at": "2026-09-23T08:48:45.674934+08:00",
+  "generated_at": "2026-09-23T08:52:25.684363+08:00",
   "scheduled_at": "2026-09-23T08:45:00+08:00",
-  "started_at": "2026-09-23T08:48:45.674934+08:00",
+  "started_at": "2026-09-23T08:52:25.684363+08:00",
   "execution_permission": "PAPER_ONLY",
   "real_trade_authorized": false,
   "current_new_entry_allowed": false,
@@ -13,8 +13,8 @@
   "updated_trading_days": 0,
   "baseline_coverage": 0.0,
   "reason": "C2-A 远端命令失败，退出码 255",
-  "source_commit": "133eab83ee088d5bb5c1be888c02033a683dd08c",
+  "source_commit": "5a390b3b540d4bdd7a5f17342e95caf22a592e59",
   "source_manifest_sha256": "4c64a987f1458f57899e5f2c2155c374693427160fb781d79232b890d1bfc694",
-  "finished_at": "2026-09-23T08:50:17.838149+08:00",
-  "payload_sha256": "3b238c8e83ee585dd46c98785e7a00c4d4f9898bdf4c3a170bdc0d83088722b4"
+  "finished_at": "2026-09-23T08:53:57.827924+08:00",
+  "payload_sha256": "e2611833e9b0a57400d313e353e0c3a9ad993d2a4047e0a807d848cd41345ca5"
 }
