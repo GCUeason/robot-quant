@@ -1,25 +1,527 @@
 {
-  "phase": "SCAN",
-  "as_of": "2026-09-25",
-  "generated_at": "2026-09-25T10:06:51.990251+08:00",
-  "scheduled_at": "2026-09-25T10:02:30+08:00",
-  "started_at": "2026-09-25T10:06:51.990251+08:00",
+  "as_of": "2026-09-28",
+  "status": "SIMULATED_ENTRY",
+  "signal_status": "SIMULATED_ENTRY",
+  "delivery_timing": "ON_TIME",
+  "requested_at": "2026-09-28T10:02:33.945987+08:00",
+  "data_status": "PROXY",
+  "cutoff": "10:00",
+  "complete_minutes": 30,
+  "generated_at": "2026-09-28T10:02:56.721991+08:00",
+  "signal_valid_until": "2026-09-28T10:03:00+08:00",
+  "elapsed_seconds": 22.406455227173865,
+  "stage_seconds": {
+    "preflight": 0.6992285903543234,
+    "quotes_and_universe": 0.34627004619687796,
+    "full_market_minutes": 18.269610531628132,
+    "feature_ranking": 0.2638559564948082,
+    "candidate_ohlc_and_simulation": 2.7861656583845615
+  },
+  "universe_count": 2591,
+  "baseline_coverage": 1.0,
+  "baseline_as_of": "2026-09-24",
+  "baseline_excluded_tickers": [],
+  "candidate_count": 156,
+  "entry_count": 2,
+  "entries": [
+    {
+      "ticker": "600790",
+      "name": "轻纺城",
+      "entry_time": "2026-09-28T09:33:00",
+      "simulated_fill_price": 3.79,
+      "shares": 1300,
+      "simulated_notional": 4927.0
+    },
+    {
+      "ticker": "600207",
+      "name": "安彩高科",
+      "entry_time": "2026-09-28T09:34:00",
+      "simulated_fill_price": 5.52,
+      "shares": 700,
+      "simulated_notional": 3863.9999999999995
+    }
+  ],
+  "watchlist": [
+    {
+      "ticker": "300162",
+      "name": "雷曼光电",
+      "scan_price": 8.65,
+      "c6": 0.07626310772164135,
+      "gain": 0.12630208333333348,
+      "amount_burst": 15.424970546507618
+    },
+    {
+      "ticker": "300599",
+      "name": "雄塑科技",
+      "scan_price": 15.08,
+      "c6": 0.43851286939943224,
+      "gain": 0.10153396639883128,
+      "amount_burst": 10.17875256437456
+    },
+    {
+      "ticker": "000756",
+      "name": "新华制药",
+      "scan_price": 14.4,
+      "c6": 0.590142671854732,
+      "gain": 0.034482758620689724,
+      "amount_burst": 22.57031853883226
+    },
+    {
+      "ticker": "002583",
+      "name": "海能达",
+      "scan_price": 8.59,
+      "c6": 0.6355382619974037,
+      "gain": 0.06973848069738486,
+      "amount_burst": 11.77813889071313
+    },
+    {
+      "ticker": "300659",
+      "name": "中孚信息",
+      "scan_price": 11.36,
+      "c6": 0.8865586272640558,
+      "gain": 0.060690943043884005,
+      "amount_burst": 8.428455030519302
+    },
+    {
+      "ticker": "600707",
+      "name": "彩虹股份",
+      "scan_price": 10.2,
+      "c6": 0.9143968871595298,
+      "gain": 0.07481559536354054,
+      "amount_burst": 9.882215863519333
+    },
+    {
+      "ticker": "688244",
+      "name": "永信至诚",
+      "scan_price": 18.57,
+      "c6": 1.1248808388941933,
+      "gain": 0.12545454545454549,
+      "amount_burst": 7.695096118132875
+    },
+    {
+      "ticker": "002669",
+      "name": "康达新材",
+      "scan_price": 15.8,
+      "c6": 1.2645914396887115,
+      "gain": 0.04290429042904287,
+      "amount_burst": 9.576261428937608
+    },
+    {
+      "ticker": "600207",
+      "name": "安彩高科",
+      "scan_price": 5.42,
+      "c6": 1.329442282749671,
+      "gain": 0.050387596899224674,
+      "amount_burst": 8.25714910608456
+    },
+    {
+      "ticker": "300100",
+      "name": "双林股份",
+      "scan_price": 21.93,
+      "c6": 1.3727359389895222,
+      "gain": 0.03736991485335861,
+      "amount_burst": 7.356192636801764
+    },
+    {
+      "ticker": "002232",
+      "name": "启明信息",
+      "scan_price": 15.83,
+      "c6": 1.5239948119325497,
+      "gain": 0.0695945945945946,
+      "amount_burst": 7.380435106586577
+    },
+    {
+      "ticker": "600293",
+      "name": "三峡新材",
+      "scan_price": 3.98,
+      "c6": 1.634241245136181,
+      "gain": 0.05291005291005302,
+      "amount_burst": 7.650183180036353
+    },
+    {
+      "ticker": "600790",
+      "name": "轻纺城",
+      "scan_price": 3.85,
+      "c6": 1.6342412451362032,
+      "gain": 0.06353591160220984,
+      "amount_burst": 7.343109263029581
+    },
+    {
+      "ticker": "600699",
+      "name": "均胜电子",
+      "scan_price": 23.48,
+      "c6": 1.796368352788602,
+      "gain": 0.03801945181255517,
+      "amount_burst": 7.527624530261775
+    },
+    {
+      "ticker": "002342",
+      "name": "巨力索具",
+      "scan_price": 8.43,
+      "c6": 1.8287937743190819,
+      "gain": 0.06844106463878319,
+      "amount_burst": 6.128812594646177
+    },
+    {
+      "ticker": "600719",
+      "name": "大连热电",
+      "scan_price": 7.88,
+      "c6": 1.9130998702983293,
+      "gain": 0.06630581867388363,
+      "amount_burst": 6.110099811490318
+    },
+    {
+      "ticker": "002553",
+      "name": "南方精工",
+      "scan_price": 16.88,
+      "c6": 2.276264591439703,
+      "gain": 0.0374923171481254,
+      "amount_burst": 5.93878836461796
+    },
+    {
+      "ticker": "301108",
+      "name": "洁雅股份",
+      "scan_price": 54.0,
+      "c6": 2.2783603431839827,
+      "gain": 0.04428543801972529,
+      "amount_burst": 6.362937112215755
+    },
+    {
+      "ticker": "603507",
+      "name": "振江股份",
+      "scan_price": 27.65,
+      "c6": 2.5940337224384047,
+      "gain": 0.03364485981308407,
+      "amount_burst": 5.886375477242569
+    },
+    {
+      "ticker": "001266",
+      "name": "宏英智能",
+      "scan_price": 36.76,
+      "c6": 2.7756160830090915,
+      "gain": 0.03258426966292127,
+      "amount_burst": 5.194829268691986
+    },
+    {
+      "ticker": "600380",
+      "name": "健康元",
+      "scan_price": 9.69,
+      "c6": 2.840466926070051,
+      "gain": 0.047567567567567526,
+      "amount_burst": 4.865611946747073
+    },
+    {
+      "ticker": "001368",
+      "name": "通达创智",
+      "scan_price": 40.14,
+      "c6": 2.9312581063553944,
+      "gain": 0.05631578947368432,
+      "amount_burst": 5.161785679385278
+    },
+    {
+      "ticker": "600418",
+      "name": "江淮汽车",
+      "scan_price": 24.08,
+      "c6": 3.158236057068753,
+      "gain": 0.05015263846489315,
+      "amount_burst": 4.763195217468066
+    },
+    {
+      "ticker": "002285",
+      "name": "世联行",
+      "scan_price": 3.39,
+      "c6": 3.2295719844358084,
+      "gain": 0.039877300613497146,
+      "amount_burst": 5.11145827368885
+    },
+    {
+      "ticker": "600616",
+      "name": "金枫酒业",
+      "scan_price": 5.33,
+      "c6": 3.3657587548638235,
+      "gain": 0.043052837573385405,
+      "amount_burst": 4.532282181389429
+    },
+    {
+      "ticker": "300207",
+      "name": "欣旺达",
+      "scan_price": 21.12,
+      "c6": 3.5938989513822683,
+      "gain": 0.05126928820308607,
+      "amount_burst": 4.489036790778624
+    },
+    {
+      "ticker": "301583",
+      "name": "托伦斯",
+      "scan_price": 146.49,
+      "c6": 3.5938989513822683,
+      "gain": 0.03241947987877958,
+      "amount_burst": 4.597039727178169
+    },
+    {
+      "ticker": "301081",
+      "name": "严牌股份",
+      "scan_price": 17.98,
+      "c6": 4.223069590085792,
+      "gain": 0.08313253012048194,
+      "amount_burst": 3.813751268218992
+    },
+    {
+      "ticker": "688265",
+      "name": "南模生物",
+      "scan_price": 53.84,
+      "c6": 4.709246901811248,
+      "gain": 0.03280260886245934,
+      "amount_burst": 4.033317038712432
+    },
+    {
+      "ticker": "300317",
+      "name": "珈伟新能",
+      "scan_price": 4.21,
+      "c6": 4.7283126787416645,
+      "gain": 0.057788944723618174,
+      "amount_burst": 3.5709340694976905
+    },
+    {
+      "ticker": "600593",
+      "name": "大连圣亚",
+      "scan_price": 50.7,
+      "c6": 4.76653696498055,
+      "gain": 0.033639143730886945,
+      "amount_burst": 3.7573921641906565
+    },
+    {
+      "ticker": "000963",
+      "name": "华东医药",
+      "scan_price": 26.85,
+      "c6": 4.8378728923476055,
+      "gain": 0.030314658480429912,
+      "amount_burst": 3.482279887291809
+    },
+    {
+      "ticker": "300981",
+      "name": "中红医疗",
+      "scan_price": 19.67,
+      "c6": 5.119161105815051,
+      "gain": 0.11697898921067584,
+      "amount_burst": 3.483968845555045
+    },
+    {
+      "ticker": "603693",
+      "name": "江苏新能",
+      "scan_price": 12.11,
+      "c6": 5.350194552529186,
+      "gain": 0.05395996518711921,
+      "amount_burst": 3.118475611704226
+    },
+    {
+      "ticker": "603773",
+      "name": "沃格光电",
+      "scan_price": 102.21,
+      "c6": 5.415045395590146,
+      "gain": 0.046161719549641766,
+      "amount_burst": 3.3379226254258962
+    },
+    {
+      "ticker": "600059",
+      "name": "古越龙山",
+      "scan_price": 11.83,
+      "c6": 5.8819714656290545,
+      "gain": 0.07545454545454544,
+      "amount_burst": 3.3340610349711755
+    },
+    {
+      "ticker": "600982",
+      "name": "宁波能源",
+      "scan_price": 5.05,
+      "c6": 6.25810635538262,
+      "gain": 0.039094650205761194,
+      "amount_burst": 2.9081561738468467
+    },
+    {
+      "ticker": "002099",
+      "name": "海翔药业",
+      "scan_price": 6.1,
+      "c6": 6.504539559014266,
+      "gain": 0.04810996563573866,
+      "amount_burst": 2.941907928316739
+    },
+    {
+      "ticker": "603728",
+      "name": "鸣志电器",
+      "scan_price": 53.08,
+      "c6": 6.906614785992227,
+      "gain": 0.039357744272567,
+      "amount_burst": 2.879755409497413
+    },
+    {
+      "ticker": "002612",
+      "name": "朗姿股份",
+      "scan_price": 17.74,
+      "c6": 7.166018158236065,
+      "gain": 0.035005834305717576,
+      "amount_burst": 2.7589753252496143
+    },
+    {
+      "ticker": "600343",
+      "name": "航天动力",
+      "scan_price": 21.07,
+      "c6": 7.516212710765247,
+      "gain": 0.037931034482758585,
+      "amount_burst": 2.6450961704852447
+    },
+    {
+      "ticker": "002212",
+      "name": "天融信",
+      "scan_price": 7.32,
+      "c6": 7.853437094682225,
+      "gain": 0.05627705627705626,
+      "amount_burst": 2.58692493887395
+    },
+    {
+      "ticker": "301190",
+      "name": "善水科技",
+      "scan_price": 21.66,
+      "c6": 8.636796949475677,
+      "gain": 0.0418470418470418,
+      "amount_burst": 2.4949967253621983
+    },
+    {
+      "ticker": "301234",
+      "name": "五洲医疗",
+      "scan_price": 129.0,
+      "c6": 9.094375595805527,
+      "gain": 0.05220228384991854,
+      "amount_burst": 2.4850864753220785
+    },
+    {
+      "ticker": "600206",
+      "name": "有研新材",
+      "scan_price": 51.84,
+      "c6": 9.494163424124524,
+      "gain": 0.04075486850030119,
+      "amount_burst": 2.2354089884379196
+    },
+    {
+      "ticker": "688137",
+      "name": "近岸蛋白",
+      "scan_price": 133.2,
+      "c6": 10.65776930409914,
+      "gain": 0.06347305389221547,
+      "amount_burst": 2.8236409394761326
+    },
+    {
+      "ticker": "300311",
+      "name": "任子行",
+      "scan_price": 6.03,
+      "c6": 11.525262154432792,
+      "gain": 0.03608247422680422,
+      "amount_burst": 2.0505061260419395
+    },
+    {
+      "ticker": "000739",
+      "name": "普洛药业",
+      "scan_price": 26.11,
+      "c6": 11.964980544747084,
+      "gain": 0.03201581027667988,
+      "amount_burst": 2.0811657939061194
+    },
+    {
+      "ticker": "301207",
+      "name": "华兰疫苗",
+      "scan_price": 19.92,
+      "c6": 13.193517635843666,
+      "gain": 0.03373118837571365,
+      "amount_burst": 1.9668128283697328
+    },
+    {
+      "ticker": "600540",
+      "name": "新赛股份",
+      "scan_price": 5.7,
+      "c6": 13.579766536964977,
+      "gain": 0.04972375690607733,
+      "amount_burst": 1.7933831373849036
+    },
+    {
+      "ticker": "600391",
+      "name": "航发科技",
+      "scan_price": 42.5,
+      "c6": 14.07263294422828,
+      "gain": 0.03709126403123486,
+      "amount_burst": 1.772586490516611
+    },
+    {
+      "ticker": "601886",
+      "name": "江河集团",
+      "scan_price": 13.54,
+      "c6": 23.424124513618683,
+      "gain": 0.03358778625954195,
+      "amount_burst": 1.3003563780086396
+    },
+    {
+      "ticker": "688185",
+      "name": "康希诺",
+      "scan_price": 85.0,
+      "c6": 30.038131553860826,
+      "gain": 0.04153902708001467,
+      "amount_burst": 1.3534769635545085
+    }
+  ],
+  "remaining_cash": 1198.9120899999998,
+  "parameters": {
+    "variant": "v1.2",
+    "scan_end": "10:00",
+    "entry_cutoff": "14:57",
+    "c6_threshold": 40.0,
+    "amount_weight": 0.5,
+    "turnover_weight": 0.3,
+    "gain_weight": 0.2,
+    "main_gain_min": 0.03,
+    "main_gain_max": 0.095,
+    "growth_gain_min": 0.03,
+    "growth_gain_max": 0.19,
+    "main_first_pullback": 0.025,
+    "growth_first_pullback": 0.035,
+    "main_second_increment": 0.005,
+    "growth_second_increment": 0.005,
+    "main_alt_increment": 0.005,
+    "growth_alt_increment": 0.005,
+    "first_weight": 0.6,
+    "second_weight": 0.4,
+    "baseline_days": 20,
+    "confirmation_minutes": 2,
+    "signal_expiry_minutes": 3,
+    "reset_c6": 35.0,
+    "reset_minutes": 2,
+    "use_relative_turnover": true,
+    "max_overshoot_main": 0.01,
+    "max_overshoot_growth": 0.015,
+    "allow_same_stock_second": false,
+    "daily_exposure_cap": 10000.0,
+    "single_stock_cap": 5000.0,
+    "max_positions": 2,
+    "max_participation": 0.05,
+    "cooldown_days": 20,
+    "commission_rate": 0.0003,
+    "minimum_commission": 5.0,
+    "stamp_tax_sell": 0.0005,
+    "transfer_fee_rate": 1e-05,
+    "slippage_bps": 5.0,
+    "price_tick": 0.01,
+    "exclude_yesterday_limit_up": true,
+    "max_allowed_limit_streak": 1
+  },
+  "promotion_gate": "FAIL",
   "execution_permission": "PAPER_ONLY",
   "real_trade_authorized": false,
   "current_new_entry_allowed": false,
-  "retryable": true,
-  "status": "DATA_NOT_READY",
-  "signal_status": "NO_SIMULATED_SIGNAL",
-  "data_status": "DATA_NOT_READY",
-  "cutoff": "10:00",
-  "entries": [],
-  "watchlist": [],
-  "entry_count": 0,
-  "candidate_count": 0,
-  "promotion_gate": "FAIL",
-  "reason": "20日同分钟基线覆盖不足: 0.00%",
-  "source_commit": "fff4f99b27a796bcf2e34ec02e611ede52bc82c1",
+  "event_count": 65,
+  "phase": "SCAN",
+  "retryable": false,
+  "scheduled_at": "2026-09-28T10:02:30+08:00",
+  "started_at": "2026-09-28T10:02:33.945987+08:00",
+  "source_commit": "f2b8375eb1960382c0efae48192c1310ad8a8743",
   "source_manifest_sha256": "981115c713c7c9ebdda68afbfbef066c3c4e1f655ad3b137c596a29aa79492c0",
-  "finished_at": "2026-09-25T10:06:53.439564+08:00",
-  "payload_sha256": "b68efa929ab2fece5a4eb18b1128c35420f3ff393653c4f18693daa57319d46a"
+  "finished_at": "2026-09-28T10:02:56.730383+08:00",
+  "payload_sha256": "4426a3eb52f6b2ae877a481b26f5ac5b490632ebc6218d82b0f1e5fbcbe06bbe"
 }
