@@ -1,9 +1,9 @@
 {
   "phase": "RESEARCH",
   "as_of": "2026-10-06",
-  "generated_at": "2026-10-06T16:35:03.853614+08:00",
+  "generated_at": "2026-10-06T16:37:11.678132+08:00",
   "scheduled_at": "2026-10-06T16:35:00+08:00",
-  "started_at": "2026-10-06T16:35:03.853614+08:00",
+  "started_at": "2026-10-06T16:37:11.678132+08:00",
   "execution_permission": "PAPER_ONLY",
   "real_trade_authorized": false,
   "current_new_entry_allowed": false,
@@ -26,8 +26,8 @@
     "reason": "未在有效A股收盘后启动研究流水线"
   },
   "promotion_gate": "FAIL",
-  "source_commit": "86c8978bf22112000be210e255171383eac8301b",
+  "source_commit": "f281a03f9e589cf7a84d8c42195859889a533823",
   "source_manifest_sha256": "1e064f3343812476f436be4ca0d5b36ef3aab2fe340567348d30ba3748219bb3",
-  "finished_at": "2026-10-06T16:35:04.136729+08:00",
-  "payload_sha256": "c258c16852f94b764b26a8c2f805b75d6b84962913288d8f3ea8336486015377"
+  "finished_at": "2026-10-06T16:37:11.721240+08:00",
+  "payload_sha256": "317ea51a52b61b5b861f9e17fabd3d2b9f81c7c21de05621187a60c870cca554"
 }
