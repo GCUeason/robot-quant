@@ -1,9 +1,9 @@
 {
   "phase": "REVIEW",
   "as_of": "2026-10-06",
-  "generated_at": "2026-10-06T16:32:11.927797+08:00",
+  "generated_at": "2026-10-06T16:34:19.292034+08:00",
   "scheduled_at": "2026-10-06T16:30:00+08:00",
-  "started_at": "2026-10-06T16:32:11.927797+08:00",
+  "started_at": "2026-10-06T16:34:19.292034+08:00",
   "execution_permission": "PAPER_ONLY",
   "real_trade_authorized": false,
   "current_new_entry_allowed": false,
@@ -20,8 +20,8 @@
     "entries": []
   },
   "promotion_gate": "FAIL",
-  "source_commit": "0a322bad147f76eae7aabbf98415b169584a8ffd",
+  "source_commit": "56d35397118908b5f3457a22c5592ccf12121299",
   "source_manifest_sha256": "1e064f3343812476f436be4ca0d5b36ef3aab2fe340567348d30ba3748219bb3",
-  "finished_at": "2026-10-06T16:32:11.930335+08:00",
-  "payload_sha256": "81900f63d6813b4521642145bcbaebfcb8946e0d88b9e46bbadaf69ed758bb80"
+  "finished_at": "2026-10-06T16:34:19.294493+08:00",
+  "payload_sha256": "6b57051c062922ab0f354f3f54aed0de6f5d60dc1ba1b6ab93218c32dc7a36ce"
 }
