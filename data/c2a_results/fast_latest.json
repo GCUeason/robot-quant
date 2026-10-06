@@ -1,9 +1,9 @@
 {
   "phase": "SCAN",
   "as_of": "2026-10-06",
-  "generated_at": "2026-10-06T10:02:33.831670+08:00",
+  "generated_at": "2026-10-06T10:04:42.399457+08:00",
   "scheduled_at": "2026-10-06T10:02:30+08:00",
-  "started_at": "2026-10-06T10:02:33.831670+08:00",
+  "started_at": "2026-10-06T10:04:42.399457+08:00",
   "execution_permission": "PAPER_ONLY",
   "real_trade_authorized": false,
   "current_new_entry_allowed": false,
@@ -18,8 +18,8 @@
   "candidate_count": 0,
   "promotion_gate": "FAIL",
   "reason": "20日同分钟基线覆盖不足: 0.00%",
-  "source_commit": "a8839ac63333806dc0c4400fa5824d1eda7a459a",
+  "source_commit": "ecf0926f016d9c2df085d959aa18b5b3cbee17d1",
   "source_manifest_sha256": "1e064f3343812476f436be4ca0d5b36ef3aab2fe340567348d30ba3748219bb3",
-  "finished_at": "2026-10-06T10:02:34.972314+08:00",
-  "payload_sha256": "a6177f6a69fa13b6fdb63e76a057b49ed3cf89c58c22af2253cc2dd1ec30b8a8"
+  "finished_at": "2026-10-06T10:04:43.655196+08:00",
+  "payload_sha256": "433802b65bd4370e83638bd1e400d16d00275cca5ee6c88b75141168822a7d09"
 }
