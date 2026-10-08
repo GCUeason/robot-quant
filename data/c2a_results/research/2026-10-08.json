@@ -1,9 +1,9 @@
 {
   "phase": "RESEARCH",
   "as_of": "2026-10-08",
-  "generated_at": "2026-10-08T16:35:03.716822+08:00",
+  "generated_at": "2026-10-08T16:39:14.704534+08:00",
   "scheduled_at": "2026-10-08T16:35:00+08:00",
-  "started_at": "2026-10-08T16:35:03.716822+08:00",
+  "started_at": "2026-10-08T16:39:14.704534+08:00",
   "execution_permission": "PAPER_ONLY",
   "real_trade_authorized": false,
   "current_new_entry_allowed": false,
@@ -30,8 +30,8 @@
     "data_status": "DATA_NOT_READY"
   },
   "promotion_gate": "FAIL",
-  "source_commit": "298238267e3e03da5a186cbc9af3772f2bca52bb",
+  "source_commit": "99aeef654bba75f7690b0d321f6572b8c84a3026",
   "source_manifest_sha256": "f15991fbb6f73a5bd7f769e8c547d93aa383d213b36f3717b22b63017a006772",
-  "finished_at": "2026-10-08T16:37:06.873926+08:00",
-  "payload_sha256": "78d95460a5200d938e12ea0ad8a6a3bc4d87c36c89f726656e36a5f2ecde01fe"
+  "finished_at": "2026-10-08T16:40:46.782014+08:00",
+  "payload_sha256": "e7d7a4b27eb737667d799e78e0486c9741e4f70aab32ffd43c4c12673da083fd"
 }
