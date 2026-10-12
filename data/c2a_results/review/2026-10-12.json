@@ -1,0 +1,60 @@
+{
+  "phase": "REVIEW",
+  "as_of": "2026-10-12",
+  "generated_at": "2026-10-12T16:30:04.745551+08:00",
+  "scheduled_at": "2026-10-12T16:30:00+08:00",
+  "started_at": "2026-10-12T16:30:04.745551+08:00",
+  "execution_permission": "PAPER_ONLY",
+  "real_trade_authorized": false,
+  "current_new_entry_allowed": false,
+  "retryable": false,
+  "status": "READY",
+  "review_mode": "ON_TIME",
+  "source_scan_status": "SIMULATED_ENTRY",
+  "source_delivery_timing": "ON_TIME",
+  "market_close_check": {
+    "status": "READY",
+    "benchmark": "600000",
+    "quote_time": "20261012161454",
+    "reason": null
+  },
+  "morning_signal": {
+    "status": "COMPLETED",
+    "reason": null,
+    "scan_status": "SIMULATED_ENTRY",
+    "signal_status": "SIMULATED_ENTRY",
+    "entries": [
+      {
+        "ticker": "601965",
+        "name": "中国汽研",
+        "entry_time": "2026-10-12T09:33:00",
+        "simulated_fill_price": 14.82,
+        "shares": 300,
+        "simulated_notional": 4446.0,
+        "close_price": 14.22,
+        "quote_time": "20261012161451",
+        "gross_mark_to_close_return": -0.04048582995951411,
+        "gross_mark_to_close_pnl": -179.9999999999999,
+        "exit_status": "NEXT_TRADING_DAY_OPEN_PENDING"
+      },
+      {
+        "ticker": "002044",
+        "name": "美年健康",
+        "entry_time": "2026-10-12T09:34:00",
+        "simulated_fill_price": 5.03,
+        "shares": 700,
+        "simulated_notional": 3521.0,
+        "close_price": 4.88,
+        "quote_time": "20261012161451",
+        "gross_mark_to_close_return": -0.02982107355864816,
+        "gross_mark_to_close_pnl": -105.00000000000026,
+        "exit_status": "NEXT_TRADING_DAY_OPEN_PENDING"
+      }
+    ]
+  },
+  "promotion_gate": "FAIL",
+  "source_commit": "0013558dfb0f0e357f5fc1637bff845b23af230f",
+  "source_manifest_sha256": "7e31fd467378ad388e37fdae7ae02cc8b8104793c49858bd3399cd352a30d779",
+  "finished_at": "2026-10-12T16:30:04.943951+08:00",
+  "payload_sha256": "146349f11f6e74962c788582c0070514d0a3066a78a90f484574a7bb44ccf184"
+}
