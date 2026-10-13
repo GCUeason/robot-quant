@@ -1,9 +1,9 @@
 {
   "phase": "REVIEW",
-  "as_of": "2026-10-12",
-  "generated_at": "2026-10-12T16:30:04.745551+08:00",
-  "scheduled_at": "2026-10-12T16:30:00+08:00",
-  "started_at": "2026-10-12T16:30:04.745551+08:00",
+  "as_of": "2026-10-13",
+  "generated_at": "2026-10-13T16:30:04.175174+08:00",
+  "scheduled_at": "2026-10-13T16:30:00+08:00",
+  "started_at": "2026-10-13T16:30:04.175174+08:00",
   "execution_permission": "PAPER_ONLY",
   "real_trade_authorized": false,
   "current_new_entry_allowed": false,
@@ -15,7 +15,7 @@
   "market_close_check": {
     "status": "READY",
     "benchmark": "600000",
-    "quote_time": "20261012161454",
+    "quote_time": "20261013161448",
     "reason": null
   },
   "morning_signal": {
@@ -25,36 +25,36 @@
     "signal_status": "SIMULATED_ENTRY",
     "entries": [
       {
-        "ticker": "601965",
-        "name": "中国汽研",
-        "entry_time": "2026-10-12T09:33:00",
-        "simulated_fill_price": 14.82,
-        "shares": 300,
-        "simulated_notional": 4446.0,
-        "close_price": 14.22,
-        "quote_time": "20261012161451",
-        "gross_mark_to_close_return": -0.04048582995951411,
-        "gross_mark_to_close_pnl": -179.9999999999999,
+        "ticker": "000011",
+        "name": "深物业A",
+        "entry_time": "2026-10-13T09:34:00",
+        "simulated_fill_price": 12.45,
+        "shares": 400,
+        "simulated_notional": 4980.0,
+        "close_price": 11.74,
+        "quote_time": "20261013161445",
+        "gross_mark_to_close_return": -0.05702811244979911,
+        "gross_mark_to_close_pnl": -283.99999999999966,
         "exit_status": "NEXT_TRADING_DAY_OPEN_PENDING"
       },
       {
-        "ticker": "002044",
-        "name": "美年健康",
-        "entry_time": "2026-10-12T09:34:00",
-        "simulated_fill_price": 5.03,
-        "shares": 700,
-        "simulated_notional": 3521.0,
-        "close_price": 4.88,
-        "quote_time": "20261012161451",
-        "gross_mark_to_close_return": -0.02982107355864816,
-        "gross_mark_to_close_pnl": -105.00000000000026,
+        "ticker": "603919",
+        "name": "XD金徽酒",
+        "entry_time": "2026-10-13T09:35:00",
+        "simulated_fill_price": 16.77,
+        "shares": 200,
+        "simulated_notional": 3354.0,
+        "close_price": 16.33,
+        "quote_time": "20261013161457",
+        "gross_mark_to_close_return": -0.026237328562910056,
+        "gross_mark_to_close_pnl": -88.00000000000026,
         "exit_status": "NEXT_TRADING_DAY_OPEN_PENDING"
       }
     ]
   },
   "promotion_gate": "FAIL",
-  "source_commit": "0013558dfb0f0e357f5fc1637bff845b23af230f",
-  "source_manifest_sha256": "7e31fd467378ad388e37fdae7ae02cc8b8104793c49858bd3399cd352a30d779",
-  "finished_at": "2026-10-12T16:30:04.943951+08:00",
-  "payload_sha256": "146349f11f6e74962c788582c0070514d0a3066a78a90f484574a7bb44ccf184"
+  "source_commit": "3690a4bf306afb6a8e593a042bd0a73784cbd0db",
+  "source_manifest_sha256": "fcd01796db359e023074b2066ca51f511223f912e0a8af43483e191b416b6c85",
+  "finished_at": "2026-10-13T16:30:04.366586+08:00",
+  "payload_sha256": "dff9745b9ae3da0e80e3f7fcbbefac8c8036283c29b81f0ddcaf4dfae0ae269d"
 }
