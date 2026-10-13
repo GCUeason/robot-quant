@@ -1,0 +1,20 @@
+{
+  "phase": "PREPARE",
+  "as_of": "2026-10-13",
+  "generated_at": "2026-10-13T08:45:04.445662+08:00",
+  "scheduled_at": "2026-10-13T08:45:00+08:00",
+  "started_at": "2026-10-13T08:45:04.445662+08:00",
+  "execution_permission": "PAPER_ONLY",
+  "real_trade_authorized": false,
+  "current_new_entry_allowed": false,
+  "retryable": true,
+  "status": "DATA_NOT_READY",
+  "baseline_as_of": null,
+  "updated_trading_days": 0,
+  "baseline_coverage": 0.0,
+  "reason": "C2-A 远端命令失败，退出码 255",
+  "source_commit": "baf4a5d92723bc9a0e08e40a677011149814358c",
+  "source_manifest_sha256": "fcd01796db359e023074b2066ca51f511223f912e0a8af43483e191b416b6c85",
+  "finished_at": "2026-10-13T08:46:36.838076+08:00",
+  "payload_sha256": "99868bae847d30e5bf8ac4bbe6991aa889dfd68eb62061fd5b3fb3358c034bfb"
+}
