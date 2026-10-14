@@ -1,9 +1,9 @@
 {
   "phase": "RESEARCH",
-  "as_of": "2026-10-13",
-  "generated_at": "2026-10-13T16:42:58.119946+08:00",
-  "scheduled_at": "2026-10-13T16:35:00+08:00",
-  "started_at": "2026-10-13T16:42:58.119946+08:00",
+  "as_of": "2026-10-14",
+  "generated_at": "2026-10-14T16:35:03.638827+08:00",
+  "scheduled_at": "2026-10-14T16:35:00+08:00",
+  "started_at": "2026-10-14T16:35:03.638827+08:00",
   "execution_permission": "PAPER_ONLY",
   "real_trade_authorized": false,
   "current_new_entry_allowed": false,
@@ -12,7 +12,7 @@
   "market_close_check": {
     "status": "READY",
     "benchmark": "600000",
-    "quote_time": "20261013161448",
+    "quote_time": "20261014161444",
     "reason": null
   },
   "research_pipeline": {
@@ -25,13 +25,13 @@
   },
   "next_session_baseline": {
     "status": "DATA_NOT_READY",
-    "baseline_as_of": "2026-10-13",
+    "baseline_as_of": "2026-10-14",
     "reason": "C2-A 远端命令失败，退出码 255",
     "data_status": "DATA_NOT_READY"
   },
   "promotion_gate": "FAIL",
-  "source_commit": "8c3b07dafa64adc20ea21f782c63e56ac7bf1ed8",
-  "source_manifest_sha256": "9c7f4658a9f49c20a4d901a13652266f840e3640db8dca251c40f97580f459c9",
-  "finished_at": "2026-10-13T16:44:30.594390+08:00",
-  "payload_sha256": "10977a85607d14f5e26f59ff93aee1675200526fdad5c6f0d155f7d530962b7f"
+  "source_commit": "0f3d490e32d32ccc859c2812c3cf7eb081a347b2",
+  "source_manifest_sha256": "a2bf50e49ef9eec83da311e4d3333b1a94f8403897ff6196f21d2b3581b64dee",
+  "finished_at": "2026-10-14T16:37:06.993510+08:00",
+  "payload_sha256": "585a0b26c8bc7781d37cb331392ba276693fcfd093c692b169bd107dd09aed9a"
 }
