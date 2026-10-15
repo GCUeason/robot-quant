@@ -1,0 +1,60 @@
+{
+  "phase": "REVIEW",
+  "as_of": "2026-10-15",
+  "generated_at": "2026-10-15T16:30:04.324554+08:00",
+  "scheduled_at": "2026-10-15T16:30:00+08:00",
+  "started_at": "2026-10-15T16:30:04.324554+08:00",
+  "execution_permission": "PAPER_ONLY",
+  "real_trade_authorized": false,
+  "current_new_entry_allowed": false,
+  "retryable": false,
+  "status": "READY",
+  "review_mode": "ON_TIME",
+  "source_scan_status": "SIMULATED_ENTRY",
+  "source_delivery_timing": "ON_TIME",
+  "market_close_check": {
+    "status": "READY",
+    "benchmark": "600000",
+    "quote_time": "20261015161456",
+    "reason": null
+  },
+  "morning_signal": {
+    "status": "COMPLETED",
+    "reason": null,
+    "scan_status": "SIMULATED_ENTRY",
+    "signal_status": "SIMULATED_ENTRY",
+    "entries": [
+      {
+        "ticker": "600556",
+        "name": "天下秀",
+        "entry_time": "2026-10-15T09:33:00",
+        "simulated_fill_price": 5.29,
+        "shares": 900,
+        "simulated_notional": 4761.0,
+        "close_price": 4.96,
+        "quote_time": "20261015161442",
+        "gross_mark_to_close_return": -0.06238185255198492,
+        "gross_mark_to_close_pnl": -297.00000000000006,
+        "exit_status": "NEXT_TRADING_DAY_OPEN_PENDING"
+      },
+      {
+        "ticker": "300111",
+        "name": "向日葵",
+        "entry_time": "2026-10-15T09:35:00",
+        "simulated_fill_price": 3.23,
+        "shares": 1200,
+        "simulated_notional": 3876.0,
+        "close_price": 3.71,
+        "quote_time": "20261015161445",
+        "gross_mark_to_close_return": 0.14860681114551078,
+        "gross_mark_to_close_pnl": 576.0,
+        "exit_status": "NEXT_TRADING_DAY_OPEN_PENDING"
+      }
+    ]
+  },
+  "promotion_gate": "FAIL",
+  "source_commit": "5809b104acecdb33b94033ca1bd54be513ae6148",
+  "source_manifest_sha256": "a2bf50e49ef9eec83da311e4d3333b1a94f8403897ff6196f21d2b3581b64dee",
+  "finished_at": "2026-10-15T16:30:04.398554+08:00",
+  "payload_sha256": "ecccb0c44aa99e2559e941b1a73add70d2292ba626449a1300761866173a3a15"
+}
