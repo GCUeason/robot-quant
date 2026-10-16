@@ -1,0 +1,60 @@
+{
+  "phase": "REVIEW",
+  "as_of": "2026-10-16",
+  "generated_at": "2026-10-16T16:30:04.661352+08:00",
+  "scheduled_at": "2026-10-16T16:30:00+08:00",
+  "started_at": "2026-10-16T16:30:04.661352+08:00",
+  "execution_permission": "PAPER_ONLY",
+  "real_trade_authorized": false,
+  "current_new_entry_allowed": false,
+  "retryable": false,
+  "status": "READY",
+  "review_mode": "ON_TIME",
+  "source_scan_status": "SIMULATED_ENTRY",
+  "source_delivery_timing": "ON_TIME",
+  "market_close_check": {
+    "status": "READY",
+    "benchmark": "600000",
+    "quote_time": "20261016161456",
+    "reason": null
+  },
+  "morning_signal": {
+    "status": "COMPLETED",
+    "reason": null,
+    "scan_status": "SIMULATED_ENTRY",
+    "signal_status": "SIMULATED_ENTRY",
+    "entries": [
+      {
+        "ticker": "600229",
+        "name": "城市传媒",
+        "entry_time": "2026-10-16T09:33:00",
+        "simulated_fill_price": 6.49,
+        "shares": 700,
+        "simulated_notional": 4543.0,
+        "close_price": 6.2,
+        "quote_time": "20261016161451",
+        "gross_mark_to_close_return": -0.044684129429892194,
+        "gross_mark_to_close_pnl": -203.00000000000003,
+        "exit_status": "NEXT_TRADING_DAY_OPEN_PENDING"
+      },
+      {
+        "ticker": "605577",
+        "name": "龙版传媒",
+        "entry_time": "2026-10-16T09:34:00",
+        "simulated_fill_price": 17.7,
+        "shares": 200,
+        "simulated_notional": 3540.0,
+        "close_price": 16.51,
+        "quote_time": "20261016161438",
+        "gross_mark_to_close_return": -0.067231638418079,
+        "gross_mark_to_close_pnl": -237.99999999999955,
+        "exit_status": "NEXT_TRADING_DAY_OPEN_PENDING"
+      }
+    ]
+  },
+  "promotion_gate": "FAIL",
+  "source_commit": "72fd7a3c63a3cc2baff341f657a07d8ce2e4e39e",
+  "source_manifest_sha256": "5695a47e65a20d6f988600852e65ce3df5753e0b74181e3e192fd66b97da6ea4",
+  "finished_at": "2026-10-16T16:30:04.779729+08:00",
+  "payload_sha256": "ae2c04142c58cd8820675c4c14f7d55ac3560b5282dd69e809d8472cb81d80b7"
+}
