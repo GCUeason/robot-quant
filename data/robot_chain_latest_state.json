@@ -1,5 +1,5 @@
 {
-  "actions": "603728连续3日跌破20日均线，减半；300024连续3日跌破20日均线，减半；002698连续3日跌破20日均线，减半",
+  "actions": "002472连续3日跌破20日均线，减半；603728连续3日跌破20日均线，减半；002747连续3日跌破20日均线，减半；300024连续3日跌破20日均线，减半；002698连续3日跌破20日均线，减半",
   "automated_trading_enabled": false,
   "cash": 47453.70320499999,
   "cumulative_commission": 260.0,
@@ -12,11 +12,11 @@
     {
       "above_moving_average": false,
       "chain_stage": "上游",
-      "close": 37.27,
+      "close": 36.89,
       "code": "002472",
       "consecutive_below": true,
       "market_value": 0.0,
-      "moving_average": 41.8955,
+      "moving_average": 41.826499999999996,
       "name": "双环传动",
       "shares": 0,
       "subsector": "RV减速器"
@@ -24,11 +24,11 @@
     {
       "above_moving_average": false,
       "chain_stage": "上游",
-      "close": 49.42,
+      "close": 47.7,
       "code": "603728",
       "consecutive_below": true,
       "market_value": 0.0,
-      "moving_average": 57.383,
+      "moving_average": 57.044500000000006,
       "name": "鸣志电器",
       "shares": 0,
       "subsector": "电机/驱动"
@@ -36,11 +36,11 @@
     {
       "above_moving_average": false,
       "chain_stage": "中游",
-      "close": 25.4,
+      "close": 25.07,
       "code": "002747",
       "consecutive_below": true,
       "market_value": 0.0,
-      "moving_average": 28.810000000000002,
+      "moving_average": 28.737000000000002,
       "name": "埃斯顿",
       "shares": 0,
       "subsector": "工业机器人本体"
@@ -48,11 +48,11 @@
     {
       "above_moving_average": false,
       "chain_stage": "中游",
-      "close": 12.48,
+      "close": 12.44,
       "code": "300024",
       "consecutive_below": true,
       "market_value": 0.0,
-      "moving_average": 13.244,
+      "moving_average": 13.222,
       "name": "机器人",
       "shares": 0,
       "subsector": "本体/系统集成"
@@ -60,23 +60,23 @@
     {
       "above_moving_average": false,
       "chain_stage": "下游",
-      "close": 10.09,
+      "close": 9.96,
       "code": "002698",
       "consecutive_below": true,
       "market_value": 0.0,
-      "moving_average": 10.8365,
+      "moving_average": 10.792,
       "name": "博实股份",
       "shares": 0,
       "subsector": "工业自动化应用"
     },
     {
-      "above_moving_average": false,
+      "above_moving_average": true,
       "chain_stage": "下游",
-      "close": 46.75,
+      "close": 50.33,
       "code": "603486",
       "consecutive_below": false,
       "market_value": 0.0,
-      "moving_average": 46.885000000000005,
+      "moving_average": 47.168499999999995,
       "name": "科沃斯",
       "shares": 0,
       "subsector": "服务机器人"
@@ -84,7 +84,7 @@
   ],
   "initial_capital": 50000.0,
   "limitations": "纸面账户，未验证Alpha，不连接券商或自动下单。",
-  "market_date": "2026-11-18",
+  "market_date": "2026-11-19",
   "max_drawdown": -0.07620991352257278,
   "portfolio_value": 47453.70320499999,
   "profit": -2546.2967950000093,
